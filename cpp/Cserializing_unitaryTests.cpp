@@ -11,7 +11,9 @@
     #define execute (main)
 #endif
 
-
+struct Stest_child {
+    int p = 555;
+};
 
 struct Stest {
     Stest(int _i, float _f, std::string _str) {
@@ -27,7 +29,9 @@ struct Stest {
     float f = 0;
     char  c[5] { '\0' };
 
-    TEST(i, f, c);
+    Stest_child s;
+
+    TEST(i, f, c, s.p);
 };
 
 class Cdummy {
@@ -41,27 +45,31 @@ class Cdummy {
 *
 */
 void unitaryTests() {
-    Cserializing::init(
-        (char [5])("abcd"),
-        Cdummy()
+    Cserializing::initialization();
+    Cserializing::registerTypes(
+        (char[5])("abcd"),
+        Cdummy(),
+        Stest_child()
     );
 
 
 
     Stest test(123, 1.23f, "abcd");
-
+    
     Cserializing pe;
 
 
-    pe.setNextData(test.__v[0]);
-    pe.setNextData(test.__v[1]);
-    pe.setNextData(test.__v[2]);
+
+    pe.setNextData(&test);
+    int ia = 5;
+    pe.setNextData(&ia);
 
     pe.changeOperationType(Cserializing::Eoperation_Get);
 
     test.i = 987;
     test.f = 7.89f;
     ::strcpy_s(test.c, "zyxw");
+    test.s.p = 999;
 
     int i(0);
     pe.getNextData(i);
@@ -69,6 +77,8 @@ void unitaryTests() {
     pe.getNextData(f);
     char c[5] { '\0' };
     pe.getNextData(c);
+    Stest sRet;
+    pe.getNextData(sRet.s.p);
 
     std::cout << i << std::endl;
 

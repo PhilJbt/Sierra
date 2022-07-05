@@ -32,7 +32,7 @@ public:
 };
 
 #define TEST2(VAR)  SvarInfo<decltype(VAR)>(VAR)
-#define TEST(...)   public: std::vector<SvarInfo> __v { ##__VA_ARGS__ }
+#define TEST(...)   friend class Cserializing; protected: std::vector<SvarInfo> __v { ##__VA_ARGS__ }
 
 
 /*
@@ -47,45 +47,25 @@ public:
         Eoperation_Set
     };
 
-    template <typename... T>
-    static void init(T&&... args) {
-        _registerBuiltinTypes();
 
-        // User types
+    template <typename... T>
+    static void registerTypes(T&&... args) {
         (registerType(args), ...);
     }
 
-    void setNextData(SvarInfo &_ptr) {
-        _chkOperation(Eoperation_Set);
-
-        _reserveBufferSize(sizeof(_ptr.m_ui8TypeId) + sizeof(uint16_t) + _ptr.m_ui32Size);
-
-        ::memcpy(&m_vecBuffer[m_iIndex], &_ptr.m_ui8TypeId, sizeof(_ptr.m_ui8TypeId));
-        m_iIndex += sizeof(_ptr.m_ui8TypeId);
-
-        uint16_t ui16Count(1);
-        ::memcpy(&m_vecBuffer[m_iIndex], &ui16Count, sizeof(uint16_t));
-        m_iIndex += sizeof(ui16Count);
-
-        ::memcpy(&m_vecBuffer[m_iIndex], _ptr.m_ptr, _ptr.m_ui32Size);
-        m_iIndex += _ptr.m_ui32Size;
-    }
 
     template<typename T>
-    void setNextData(const T *_var, int _iCount = 1) {
-        _chkOperation(Eoperation_Set);
+    void setNextData(T *_var, int _iCount = 1) {
+        constexpr bool has_varInfos = requires(T * _var) {
+            _var->__v;
+        };
 
-        uint8_t ui8TypeId(0);
-        uint32_t ui32TypeSize(0);
-        _getTypeInfos(_var, &ui8TypeId, &ui32TypeSize, nullptr, false);
-
-        _setHeader(_var, ui8TypeId, _iCount);
-
-        uint32_t ui32DataSize(ui32TypeSize * _iCount);
-        _reserveBufferSize(ui32DataSize);
-
-        ::memcpy(&m_vecBuffer[m_iIndex], _var, ui32TypeSize);
-        _incrementIndex(ui32DataSize);
+        if constexpr (has_varInfos) {
+            for (int i(0); i < _var->__v.size(); ++i)
+                _setNextData_structvar(_var->__v[i]);
+        }
+        else
+            _setNextData_template(_var, _iCount);
     }
 
     template<typename U>
@@ -94,7 +74,7 @@ public:
 
         uint8_t ui8TypeId(0);
         uint32_t ui32TypeSize(0);
-        _getTypeInfos(_vec, &ui8TypeId, &ui32TypeSize, nullptr, false);
+        _getTypeInfos(_vec, &ui8TypeId, &ui32TypeSize, nullptr, true);
 
         int iCount(static_cast<int>(_vec->size()));
         _setHeader(_vec, ui8TypeId, iCount);
@@ -113,7 +93,7 @@ public:
         uint8_t ui8TypeId(0);
         uint32_t ui32Size(0);
         std::vector<uint32_t> vecTypeSizes;
-        _getTypeInfos(_map, &ui8TypeId, &ui32Size, &vecTypeSizes, false);
+        _getTypeInfos(_map, &ui8TypeId, &ui32Size, &vecTypeSizes, true);
 
         int iCount(static_cast<int>(_map->size()));
         _setHeader(_map, ui8TypeId, iCount);
@@ -135,7 +115,7 @@ public:
 
         uint8_t ui8TypeId(0);
         uint32_t ui32TypeSize(0);
-        if (_getTypeInfos(_var, &ui8TypeId, &ui32TypeSize, nullptr, true))
+        if (_getTypeInfos(_var, &ui8TypeId, &ui32TypeSize, nullptr, false))
             return;
 
         uint16_t ui16Count(_getElemCount());
@@ -151,7 +131,7 @@ public:
 
         uint8_t ui8TypeId(0);
         uint32_t ui32TypeSize(0);
-        if (_getTypeInfos(&_vec[0], &ui8TypeId, &ui32TypeSize, nullptr, true))
+        if (_getTypeInfos(&_vec[0], &ui8TypeId, &ui32TypeSize, nullptr, false))
             return;
 
         uint16_t ui16Count(_getElemCount());
@@ -168,7 +148,7 @@ public:
 
         uint8_t ui8TypeId(0);
         std::vector<uint32_t> vecTypesSizes;
-        if (_getTypeInfos(&_map, &ui8TypeId, nullptr, &vecTypesSizes, true))
+        if (_getTypeInfos(&_map, &ui8TypeId, nullptr, &vecTypesSizes, false))
             return;
 
         uint16_t ui16Count(_getElemCount());
@@ -229,8 +209,8 @@ public:
             *_out_vecTypeSizes = itElem->second;
     }
 
-private:
-    static void _registerBuiltinTypes() {
+
+    static void initialization() {
         // Typically 1 Byte
         registerType(bool());
         registerType(char());
@@ -286,14 +266,46 @@ private:
         registerType(unsigned long long());
     }
 
+private:
+    template<typename T>
+    void _setNextData_template(const T *_var, int _iCount) {
+        _chkOperation(Eoperation_Set);
+
+        uint8_t ui8TypeId(0);
+        uint32_t ui32TypeSize(0);
+        _getTypeInfos(*_var, &ui8TypeId, &ui32TypeSize, nullptr, true);
+
+        _setHeader(_var, ui8TypeId, _iCount);
+
+        uint32_t ui32DataSize(ui32TypeSize * _iCount);
+        _reserveBufferSize(ui32DataSize);
+
+        ::memcpy(&m_vecBuffer[m_iIndex], _var, ui32TypeSize);
+        _incrementIndex(ui32DataSize);
+    }
+
+    void _setNextData_structvar(SvarInfo &_ptr) {
+        _chkOperation(Eoperation_Set);
+
+        _reserveBufferSize(sizeof(_ptr.m_ui8TypeId) + sizeof(uint16_t) + _ptr.m_ui32Size);
+
+        ::memcpy(&m_vecBuffer[m_iIndex], &_ptr.m_ui8TypeId, sizeof(_ptr.m_ui8TypeId));
+        m_iIndex += sizeof(_ptr.m_ui8TypeId);
+
+        uint16_t ui16Count(1);
+        ::memcpy(&m_vecBuffer[m_iIndex], &ui16Count, sizeof(uint16_t));
+        m_iIndex += sizeof(ui16Count);
+
+        ::memcpy(&m_vecBuffer[m_iIndex], _ptr.m_ptr, _ptr.m_ui32Size);
+        m_iIndex += _ptr.m_ui32Size;
+    }
+
     template<typename T>
     bool _getTypeInfos(const T &_t, uint8_t *_out_ui8TypeId, uint32_t *_out_ui32TypeFullSize, std::vector<uint32_t> *_out_vecTypeSizes, const bool &_bSet) {
         std::type_index tiCur(std::type_index(typeid(_t)));
         bool bFound(s_mapTypes.count(tiCur) == 1);
-        if (_bSet && !bFound)
+        if (!bFound)
             throw std::runtime_error("Type not registered yet");
-        else if (!_bSet && !bFound)
-            return true;
         std::unordered_map<std::type_index, std::vector<uint32_t>>::iterator itElem(s_mapTypes.find(tiCur));
 
         if (_out_ui8TypeId != nullptr)
@@ -303,7 +315,7 @@ private:
         if (_out_vecTypeSizes != nullptr)
             *_out_vecTypeSizes = itElem->second;
 
-        if (_bSet) {
+        if (!_bSet) {
             _chkExpectedType(_out_ui8TypeId);
             m_iIndex += sizeof(uint8_t);
         }
