@@ -12,7 +12,9 @@
 #endif
 
 struct Stest_child {
-    int p = 555;
+    int p = 0;
+
+    TEST(p);
 };
 
 struct Stest {
@@ -31,13 +33,7 @@ struct Stest {
 
     Stest_child s;
 
-    TEST(i, f, c, s.p);
-};
-
-class Cdummy {
-    int i;
-    char c;
-    float f;
+    TEST(i, f, c, s);
 };
 
 /*
@@ -48,102 +44,39 @@ void unitaryTests() {
     Cserializing::initialization();
     Cserializing::registerTypes(
         (char[5])("abcd"),
-        Cdummy(),
-        Stest_child()
+        std::vector<double>(),
+        std::map<double, bool>()
     );
 
-
-
-    Stest test(123, 1.23f, "abcd");
-    
     Cserializing pe;
 
 
 
-    pe.setNextData(&test);
-    int ia = 5;
-    pe.setNextData(&ia);
+    Stest sA(9, 8.7f, "zzzz");
+    sA.s.p = 987;
+    pe.setNextData(sA);
+
+    std::vector<double> vecA { 5.5, 9.9, 7.7 };
+    pe.setNextData(vecA);
+
+    std::map<double, bool> mapA { { 1.23, true }, { 6.54, false }, { 7.89, true } };
+    pe.setNextData(mapA);
+
+
 
     pe.changeOperationType(Cserializing::Eoperation_Get);
 
-    test.i = 987;
-    test.f = 7.89f;
-    ::strcpy_s(test.c, "zyxw");
-    test.s.p = 999;
-
-    int i(0);
-    pe.getNextData(i);
-    float f(.0f);
-    pe.getNextData(f);
-    char c[5] { '\0' };
-    pe.getNextData(c);
-    Stest sRet;
-    pe.getNextData(sRet.s.p);
-
-    std::cout << i << std::endl;
-
-    /*
-    return;
-    Cserializing::init();
-
-    int iArr[10000] { 0 };
-    for (int i(0); i < 10000; ++i)
-        iArr[i] = rand() % INT_MAX;
-
-    Cserializing pe;
-    for (int i(0); i < 10000; ++i)
-        pe.setNextData(&iArr[i]);
-
-    pe.changeOperationType(Cserializing::Eoperation_Get);
-
-    for (int i(0); i < 10000; ++i) {
-        int j = 0;
-        pe.getNextData(&j);
-        if (j != iArr[i]) throw std::runtime_error("Get returned a wrong value.");
-    }
-
-    return;
-
-    Cserializing::registerType(std::vector<double>());
-    Cserializing::registerType(std::map<double, bool>());
-    Cserializing::registerType(Stest());
-
-    Cserializing qzd;
-
-    int *i = new int;
-    *i = 5;
-    qzd.setNextData(i);
-    delete i;
-
-    float f(5.123456789f);
-    qzd.setNextData(&f);
-
-    std::vector<double> vec { 5.5, 9.9, 7.7 };
-    qzd.setNextData(&vec);
-
-    std::map<double, bool> map { { 1.23, true }, { 6.54, false }, { 7.89, true } };
-    qzd.setNextData(&map);
-
-    Stest stc(5, 7, "abcd");
-    qzd.setNextData(&stc);
 
 
+    Stest sB(1, 2.3f, "aaaa");
+    sB.s.p = 123;
+    pe.wtf(sB);
 
-    qzd.changeOperationType(Cserializing::Eoperation_Get);
+    std::vector<double> vecB;
+    pe.wtf(vecB);
 
-
-
-    int j = 0;
-    qzd.getNextData(&j);
-    float l = .0f;
-    qzd.getNextData(&l);
-    std::vector<double> m;
-    qzd.getNextData(&m);
-    std::map<double, bool> n;
-    qzd.getNextData(&n);
-    Stest o;
-    qzd.getNextData(&o);
-    */
+    std::map<double, bool> mapB;
+    pe.wtf(mapB);
 }
 
 
