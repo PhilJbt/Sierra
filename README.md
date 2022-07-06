@@ -26,11 +26,13 @@ There are also [some examples](../cpp/Cserializing_unitaryTests.cpp#L01-L02) and
 # USAGE
 ```cpp
 Cserializing::initialization();
+
 Cserializing::registerTypes(
-  (char[5])("abcd"),
-  std::vector<double>(),
-  std::map<double, bool>()
+    std::vector<double>(),
+    std::map<double, bool>()
 );
+
+
 
 Cserializing pe;
 
@@ -39,6 +41,12 @@ Cserializing pe;
 Stest sA(9, 8.7f, "zzzz");
 sA.s.p = 987;
 pe.setNextData(sA);
+
+int iA(INT_MAX);
+pe.setNextData(iA);
+
+int iArrA[5] { 1, 2, 3, 4, 5 };
+pe.setNextData(iArrA);
 
 std::vector<double> vecA { 5.5, 9.9, 7.7 };
 pe.setNextData(vecA);
@@ -54,13 +62,19 @@ pe.changeOperationType(Cserializing::Eoperation_Get);
 
 Stest sB(1, 2.3f, "aaaa");
 sB.s.p = 123;
-pe._PROTO_get(sB);
+pe.getNextData(sB);
+
+int iB(0);
+pe.getNextData(iB);
+
+int iArrB[5] { 0 };
+pe.getNextData(iArrB);
 
 std::vector<double> vecB;
-pe._PROTO_get(vecB);
+pe.getNextData(vecB);
 
 std::map<double, bool> mapB;
-pe._PROTO_get(mapB);
+pe.getNextData(mapB);
 ```
 
 ###### [Return to index](#index)
