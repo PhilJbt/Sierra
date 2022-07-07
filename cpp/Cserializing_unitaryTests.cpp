@@ -57,19 +57,46 @@ void unitaryTests() {
     Cserializing::initialization();
 
     Cserializing::registerTypes(
-        std::vector<double>(),
+        /*std::vector<double>(),
         std::vector<uint64_t>(),
         std::map<double, bool>(),
         std::vector<int64_t>(),
-        std::map<int16_t, int64_t>()
+        std::map<int16_t, int64_t>()*/
     );
 
+    //vector of vector of builtin_type
 
+    //std::byte
+    //std::pair
+    //std::tuple
+    //std::stack
+    //std::deque
+    //std::queue
+    //std::priority_queue
+    //std::list
+    //std::forward_list
+    //std::array
+    //std::set
+    //std::multiset
+    //std::multimap
+    //std::unordered_set
+    //std::unordered_map
+    //std::unordered_multiset
+    //std::unordered_multimap
 
     Cserializing pe;
 
+    int iA(INT_MAX);
+    pe.setNextData(iA);
 
+    pe.changeOperationType(Cserializing::Eoperation_Get);
 
+    int iB(0);
+    if (pe.isNextData(iB))
+        pe.getNextData(iB);
+    if (SK_COMPARE_INT(iA, iB)) throw std::runtime_error("Get INT failed.");
+
+    /*
     int iA(INT_MAX);
     pe.setNextData(iA);
 
@@ -123,7 +150,7 @@ void unitaryTests() {
 
     pe.changeOperationType(Cserializing::Eoperation_Get);
 
-
+    
 
     int iB(0);
     if (pe.isNextData(iB))
@@ -203,6 +230,7 @@ void unitaryTests() {
     if (SK_COMPARE_VEC((*mapPtrA), (*mapPtrB))) throw std::runtime_error("Get MAP<INT16_T, INT64_T>* failed.");
     delete mapPtrA;
     delete mapPtrB;
+    */
 }
 
 

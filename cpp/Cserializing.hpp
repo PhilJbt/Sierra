@@ -401,65 +401,42 @@ public:
 
     static void initialization() {
         /*
-        ***************************
-        *  ID          TYPE    BYTE
-        ***************************
-        *   0          bool       1
-        *   1           int       1
-        *   2           int       2
-        *   3           int       4
-        *   4           int       8
-        *   5           int      16
-        *   6          uint       1
-        *   7          uint       2
-        *   8          uint       4
-        *   9          uint       8
-        *  10          uint      16
-        *  11          char       1
-        *  12          char       2
-        *  13          char       4
-        *  14         uchar       1
-        *  15         uchar       2
-        *  16         wchar       2
-        *  17         wchar       4
-        *  18         short       2
-        *  19         short       4
-        *  20         short       8
-        *  21        ushort       2
-        *  22        ushort       4
-        *  23        ushort       8
-        *  24         float       4
-        *  25         float       8
-        *  26         float      16
-        *  27        double       8
-        *  28        double      16
-        *  29   std::string      --
+        ******************************
+        *  ID    BITS     TYPE
+        ******************************
+        *   0       0     N/A
+        *   1       8     bool
+        *   2       8     char, short, int, signed, long
+        *   3      16     char, short, int, signed, long
+        *   4      24     char, short, int, signed, long
+        *   5      32     char, short, int, signed, long
+        *   6      64     char, short, int, signed, long
+        *   7       8     uchar, ushort, uint, unsigned, ulong
+        *   8      16     uchar, ushort, uint, unsigned, ulong
+        *   9      24     uchar, ushort, uint, unsigned, ulong
+        *  10      32     uchar, ushort, uint, unsigned, ulong
+        *  11      64     uchar, ushort, uint, unsigned, ulong
+        *  12      32     float, long float, double, long double
+        *  13      64     float, long float, double, long double
+        *  14     128     float, long float, double, long double
+        *  15     N/A     std::string
+        *  16     N/A     std::wstring
         * 
         ** _registerType({ {iBytesSize, iIndex}[, {iBytesSize, iIndex}] }, type());
         **/
 
         // bool
-        _registerType({ {1, 0} }, bool());
-        // int
-        _registerType({ {1, 1}, {2, 2}, {4, 3}, {8, 4}, {16, 5} }, int8_t(), int16_t(), int32_t(), int64_t(), signed(), int(), signed int(), long(), long int(), signed long(), signed long int(), long long int(), signed long long int(), long long(), unsigned long long(), long long(), signed long long(), unsigned long long());
-        // uint
-        _registerType({ {1, 6}, {2, 7}, {4, 8}, {8, 9}, {16, 10} }, uint8_t(), uint16_t(), uint32_t(), uint64_t(), unsigned(), unsigned int(), unsigned long(), unsigned long int(), unsigned long long int());
-        // char
-        _registerType({ {1, 11}, {2, 12}, {4, 13} }, char(), char8_t(), signed char(), char16_t(), char32_t());
-        // uchar
-        _registerType({ {1, 14}, {2, 15} }, unsigned char());
-        // wchar
-        _registerType({ {2, 16} , {4, 17} }, wchar_t());
-        // short
-        _registerType({ {2, 18}, {4, 19}, {8, 20} }, short(), short int(), signed short(), signed short int());
-        // ushort
-        _registerType({ {2, 21}, {4, 22}, {8, 23} }, unsigned short int());
-        // float
-        _registerType({ {4, 24}, {8, 25}, {16, 26} }, float(), float_t());
-        // double
-        _registerType({ {8, 27}, {16, 28} }, double(), double_t(), long double());
+        _registerType({ {1, 1} }, bool());
+        // char, short, int, signed, long
+        _registerType({ {1, 2}, {2, 3}, {4, 4}, {8, 5}, {16, 6} }, int8_t(), char(), signed char(), int16_t(), short(), short int(), signed short int(), int32_t(), int(), signed(), signed int(), long(), long int(), signed long int(), int64_t(), long long(), signed long long(), long long());
+        // uchar, ushort, uint, unsigned, ulong
+        _registerType({ {1, 7}, {2, 8}, {4, 9}, {8, 10}, {16, 11} }, uint8_t(), unsigned char(), uint16_t(), wchar_t(), unsigned short(), unsigned short int(), unsigned long(), unsigned long int(), uint32_t(), unsigned int(), unsigned(), uint64_t(), unsigned long long());
+        // float, long float, double, long double
+        _registerType({ {4, 12}, {8, 13}, {16, 14} }, float_t(), float(), double_t(), double(), long double());
         // std::string
-        _registerType_force(29, sizeof(std::string("TEST")[0]), std::string());
+        _registerType_force(15, sizeof(std::string("TEST")[0]), std::string());
+        // std::wstring
+        _registerType_force(16, sizeof(std::wstring(L"TEST")[0]), std::wstring());
     }
 
 private:
