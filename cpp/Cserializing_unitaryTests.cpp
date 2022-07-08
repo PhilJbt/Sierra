@@ -56,14 +56,6 @@ struct Stest {
 void unitaryTests() {
     Cserializing::initialization();
 
-    Cserializing::registerTypes(
-        /*std::vector<double>(),
-        std::vector<uint64_t>(),
-        std::map<double, bool>(),
-        std::vector<int64_t>(),
-        std::map<int16_t, int64_t>()*/
-    );
-
     //vector of vector of builtin_type
 
     //std::byte
@@ -84,8 +76,73 @@ void unitaryTests() {
     //std::unordered_multiset
     //std::unordered_multimap
 
-    Cserializing pe;
+    // T
+    {
+        Cserializing pe;
 
+        int64_t i64A(INT64_MIN);
+        pe.setNextData(i64A);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        int64_t i64B(0);
+        if (pe.isNextData(i64B))
+            pe.getNextData(i64B);
+        if (SK_COMPARE_INT(i64A, i64B)) throw std::runtime_error("Get UINT64 failed.");
+    }
+
+    // T *
+    {
+        Cserializing pe;
+
+        int64_t *i64A(new int64_t(INT64_MIN));
+        pe.setNextData(i64A);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        int64_t *i64B(new int64_t(0));
+        if (pe.isNextData(i64B))
+            pe.getNextData(i64B);
+        if (SK_COMPARE_INT((*i64A), (*i64B))) throw std::runtime_error("Get UINT64 * failed.");
+        delete i64A;
+        delete i64B;
+    }
+
+    // STD::VECTOR
+    {
+        Cserializing pe;
+
+        std::vector<uint8_t> vecA { 11, 33, 22 };
+        pe.setNextData(vecA);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        std::vector<uint8_t> vecB;
+        if (pe.isNextData(vecB))
+            pe.getNextData(vecB);
+        if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("Get STD::VECTOR failed.");
+    }
+
+    // STD::VECTOR *
+    {
+        Cserializing pe;
+
+        std::vector<uint8_t> *vecA(new std::vector<uint8_t>({ 11, 33, 22 }));
+        pe.setNextData(vecA);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        std::vector<uint8_t> *vecB(new std::vector<uint8_t>());
+        if (pe.isNextData(vecB))
+            pe.getNextData(vecB);
+        if (SK_COMPARE_VEC((*vecA), (*vecB))) throw std::runtime_error("Get STD::VECTOR * failed.");
+        delete vecA;
+        delete vecB;
+    }
+
+
+
+    /*
     int iA(INT_MAX);
     pe.setNextData(iA);
 
@@ -95,6 +152,9 @@ void unitaryTests() {
     if (pe.isNextData(iB))
         pe.getNextData(iB);
     if (SK_COMPARE_INT(iA, iB)) throw std::runtime_error("Get INT failed.");
+    */
+
+
 
     /*
     int iA(INT_MAX);
