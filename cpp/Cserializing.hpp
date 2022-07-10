@@ -11,33 +11,30 @@
 #include <concepts>
 
 
-
-struct StypeInfos;
-
 typedef uint8_t  typeId_t;
 typedef uint32_t typeSize_t;
 typedef uint16_t dataCount_t;
-typedef std::unordered_map<std::string, StypeInfos*>    mapTypesInfos_byName;
-typedef std::unordered_map<typeId_t,    StypeInfos*>    mapTypesInfos_byId;
-typedef std::vector<StypeInfos*>                        vecTypesIdsNames;
-
 
 
 struct StypeInfos {
 public:
-    StypeInfos(std::type_index _type, typeId_t _ui8TypeId, typeSize_t _ui32Size, std::string _strTypeName)
-        : m_ui8TypeId(_ui8TypeId), m_ui32Size(_ui32Size), m_type(_type), m_strTypeName(_strTypeName) {}
-    typeId_t        typeId()   { return m_ui8TypeId; };
-    typeSize_t      size()     { return m_ui32Size;  };
+    StypeInfos(typeId_t _ui8TypeId, typeSize_t _ui32Size, std::string _strTypeName)
+        : m_ui8TypeId(_ui8TypeId), m_ui32Size(_ui32Size), m_strTypeName(_strTypeName) {}
+
+    typeId_t        typeId()   { return m_ui8TypeId;   };
+    typeSize_t      size()     { return m_ui32Size;    };
     std::string     typeName() { return m_strTypeName; };
-    std::type_index type()     { return m_type;  };
+
 private:
     typeId_t        m_ui8TypeId   = 0;
     typeSize_t      m_ui32Size    = 0;
     std::string     m_strTypeName = "";
-    std::type_index m_type        = typeid(void);
 };
 
+
+typedef std::unordered_map<std::string, StypeInfos *> mapTypesInfos_byName;
+typedef std::unordered_map<typeId_t, StypeInfos *>    mapTypesInfos_byId;
+typedef std::vector<StypeInfos *>                     vecTypesIdsNames;
 
 
 /*
@@ -46,29 +43,72 @@ private:
 */
 class Cserializing {
 public:
-    struct SvarInfo {
+    struct SvarInfo_var_base {
     public:
-        template <typename T>
-        SvarInfo(T &_var) {
-            if (!_isVarNode(_var))
-                _storeVar(_var);
+        virtual ~SvarInfo_var_base() {}
+        virtual void populate(Cserializing *_ptrSerializer) const = 0;
+    };
+
+    template <typename T>
+    struct SvarInfo_var : public SvarInfo_var_base {
+    public:
+        SvarInfo_var(T *_var) : SvarInfo_var_base(), m_val(_var) {}
+
+        ~SvarInfo_var() {
+            m_val = nullptr;
         }
 
+        void populate(Cserializing *_ptrSerializer) {
+            _ptrSerializer->_setNextData_template(m_val);
+        }
 
-        const vecTypesIdsNames & typeIdsNames() const { return m_vecTypeIdsName; }
-        dataCount_t        count()        const { return m_ui16Count; }
-        void             * ptr()          const { return m_ptr; }
-        bool               isInfoVec()    const { return m_bIsVarInfosVec; }
+        T *val() { return m_val; }
+    private:
+        T *m_val;
+    };
+
+    struct SvarInfo_base {
+    public:
+        virtual ~SvarInfo_base(){}
+
+        const vecTypesIdsNames &typeIdsNames() const { return m_vecTypeIdsName; }
+        dataCount_t             count()        const { return m_ui16Count; }
+        void                   *ptrNode()      const { return m_ptrNode; }
+        bool                    isInfoVec()    const { return m_bIsVarInfosVec; }
+
+        virtual void                                                       ptrVar(Cserializing *_ptrSerializer) const {}
+
+    protected:
+        vecTypesIdsNames   m_vecTypeIdsName;
+        dataCount_t        m_ui16Count      = 0;
+        void              *m_ptrNode        = nullptr;
+        bool               m_bIsVarInfosVec = false;
+    };
+
+    template <typename T>
+    struct SvarInfo : public SvarInfo_base {
+    public:
+        SvarInfo(T &_var) {
+            if (Cserializing::s_bRegisterDone) {
+                if (!_storeNode(_var))
+                    _storeVar(_var);
+            }
+        }
+
+        void ptrVar(Cserializing *_ptrSerializer) const {
+            //m_ptrVar->populate(_ptrSerializer);
+            _ptrSerializer->_setNextData_template(*m_ptrVar);
+        }
 
     private:
         template <typename T>
-        bool _isVarNode(T &_var) {
+        bool _storeNode(T &_var) {
             constexpr bool has_varInfos = requires(T & _var) {
                 _var.__v;
             };
 
             if constexpr (has_varInfos) {
-                m_ptr = &_var.__v;
+                m_ptrNode = (void *)&_var.__v;
                 m_bIsVarInfosVec = true;
             }
             else
@@ -77,14 +117,16 @@ public:
             return true;
         }
 
-        template <typename T>
+        template<typename T>
         void _storeVar(T &_var) {
             StypeInfos *sTypeInfos(nullptr);
-            Cserializing::getTypeInfos_byType(T(), &sTypeInfos);
+            Cserializing::getTypeInfos_byType(_var, &sTypeInfos);
             m_vecTypeIdsName.push_back(sTypeInfos);
 
-            m_ptr = &_var;
+            //m_ptrNode = (void *)&_var;
             m_ui16Count = 1;
+            //m_ptrVar = new SvarInfo_var<T>(&_var);
+            m_ptrVar = &_var;
         }
 
         template <typename T, size_t N>
@@ -93,36 +135,40 @@ public:
             Cserializing::getTypeInfos_byType(_var[0], &sTypeInfos);
             m_vecTypeIdsName.push_back(sTypeInfos);
 
-            m_ptr = &_var;
+            //m_ptrNode = (void *)&_var;
             m_ui16Count = N;
+            //m_ptrVar = new SvarInfo_var<T[N]>(&_var);
+            m_ptrVar = &_var;
         }
 
+        
         void _storeVar(std::string &_str) {
             StypeInfos *sTypeInfos(nullptr);
             Cserializing::getTypeInfos_byName("std::string", &sTypeInfos);
             m_vecTypeIdsName.push_back(sTypeInfos);
 
-            m_ptr = &_str;
+            //m_ptrNode = (void *)&_str;
             m_ui16Count = static_cast<dataCount_t>(_str.length());
+            //m_ptrVar = new SvarInfo_var(&_str);
+            m_ptrVar = &_str;
         }
 
         template <typename U>
         void _storeVar(std::vector<U> &_vec) {
-            StypeInfos *sTypeInfos_vec(nullptr),
-                       *sTypeInfos_var(nullptr);
+            StypeInfos *sTypeInfos_vec(nullptr);
+            StypeInfos *sTypeInfos_var(nullptr);
             Cserializing::getTypeInfos_byName("std::vector", &sTypeInfos_vec);
-            Cserializing::getTypeInfos_byType(_vec[0], &sTypeInfos_var);
+            Cserializing::getTypeInfos_byType(U(), &sTypeInfos_var);
             m_vecTypeIdsName.push_back(sTypeInfos_vec);
             m_vecTypeIdsName.push_back(sTypeInfos_var);
 
-            m_ptr = &_vec;
+            //m_ptrNode = (void*)&_vec;
             m_ui16Count = static_cast<dataCount_t>(_vec.size());
+            //m_ptrVar = new SvarInfo_var<std::vector<U>>(&_vec);
+            m_ptrVar = &_vec;
         }
 
-        vecTypesIdsNames  m_vecTypeIdsName;
-        dataCount_t       m_ui16Count      = 0;
-        void             *m_ptr            = nullptr;
-        bool              m_bIsVarInfosVec = false;
+        T *m_ptrVar = nullptr;
     };
 
 
@@ -132,6 +178,27 @@ public:
         Eoperation_Set
     };
 
+
+    template <typename T>
+    static void __v_push_var(std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> &_vec, T &_var) {
+        _vec.push_back(std::make_unique<Cserializing::SvarInfo<T>>(_var));
+    }
+
+    template <typename... T>
+    static std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> __v_push(T&&... args) {
+        if (Cserializing::s_bRegisterDone) {
+
+            std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> __v;
+
+            //(__v.push_back( std::move(std::unique_ptr<T>(new Cserializing::SvarInfo(args))) ), ...);
+            //(__v.push_back(std::move(new Cserializing::SvarInfo(args))), ...);
+            (__v_push_var(__v, args), ...);
+            
+            return __v;
+        }
+        else
+            return std::vector<std::unique_ptr<Cserializing::SvarInfo_base>>();
+    }
 
 
     template<typename T>
@@ -148,8 +215,8 @@ public:
 
     template<typename U>
     bool _nextDataType(const std::vector<U> &_vec) {
-        StypeInfos *sTypeInfos_vec(nullptr),
-                   *sTypeInfos_var(nullptr);
+        StypeInfos *sTypeInfos_vec(nullptr);
+        StypeInfos *sTypeInfos_var(nullptr);
         getTypeInfos_byName("std::vector", &sTypeInfos_vec);
         getTypeInfos_byType(U(), &sTypeInfos_var);
 
@@ -189,7 +256,17 @@ public:
 
     template<typename T>
     void getNextData(T &_var, typename std::enable_if<!std::is_pointer<T>::value>::type* = 0) {
-        _getNextData_template(_var);
+        constexpr bool has_varInfos = requires(T & _var) {
+            _var.__v;
+        };
+
+        if constexpr (has_varInfos) {
+            _getNextData_template(_var);
+
+
+        }
+        else
+            _getNextData_template(_var);
     }
 
 
@@ -243,9 +320,26 @@ public:
         *_out_sTypeInfos = itElem->second;
     }
 
+    template <typename... T>
+    static void initialization(T&&... args) {
+        _initialization();
 
-    static void initialization() {
-        registerTypes(
+        (_registerType_force(typeid(args).name(), 0), ...);
+
+        Cserializing::s_bRegisterDone = true;
+    }
+
+    static void desinitialisation() {
+        for (auto &&elem : s_mapTypes_byName)
+            delete elem.second;
+
+        s_mapTypes_byName.clear();
+        s_mapTypes_byId.clear();
+    }
+
+private:
+    static void _initialization() {
+        _registerTypes(
             bool(),
             int8_t(), char(), signed char(),
             int16_t(), short(), short int(), signed short int(),
@@ -265,26 +359,17 @@ public:
     }
 
     template <typename... T>
-    static void registerTypes(T&&... args) {
+    static void _registerTypes(T&&... args) {
         (_registerType_unpack(args), ...);
     }
 
-    static void desinitialisation() {
-        for (auto &&elem : s_mapTypes_byName)
-            delete elem.second;
-
-        s_mapTypes_byName.clear();
-        s_mapTypes_byId.clear();
-    }
-
-private:
     template<typename T>
     static void _registerType_unpack(const T &_t) {
         typeId_t         ui8TypeId(static_cast<typeId_t>(s_mapTypes_byName.size()) + 1);
         typeSize_t       ui32Size(sizeof(_t));
         std::type_index  type(typeid(_t));
         std::string      strTypeName(typeid(_t).name());
-        StypeInfos      *sTemp(new StypeInfos(type, ui8TypeId, ui32Size, strTypeName));
+        StypeInfos      *sTemp(new StypeInfos(ui8TypeId, ui32Size, strTypeName));
 
         s_mapTypes_byId.insert(
             {
@@ -304,7 +389,7 @@ private:
     static void _registerType_force(std::string _str, const typeSize_t &_ui32Size = 0) {
         typeId_t         ui8TypeId(static_cast<typeId_t>(s_mapTypes_byName.size()) + 1);
         std::type_index  type(typeid(void));
-        StypeInfos      *sTemp(new StypeInfos(type, ui8TypeId, _ui32Size, _str));
+        StypeInfos      *sTemp(new StypeInfos(ui8TypeId, _ui32Size, _str));
 
         s_mapTypes_byId.insert(
             {
@@ -343,7 +428,7 @@ private:
             _getNextData_var(_var);
     }
 
-    void _getNextData_varInfo(const SvarInfo &_ptr) {
+    void _getNextData_varInfo(const SvarInfo_base &_ptr) {
         _chkOperation(Eoperation_Get);
 
         m_iIndex += sizeof(typeId_t);
@@ -351,7 +436,7 @@ private:
         dataCount_t ui16Count(_isNextCount());
         uint32_t    ui32DataSize(_ptr.typeIdsNames()[0]->size() * ui16Count);
 
-        ::memcpy(_ptr.ptr(), &m_vecBuffer[m_iIndex], ui32DataSize);
+        ::memcpy(_ptr.ptrNode(), &m_vecBuffer[m_iIndex], ui32DataSize);
         _incrementIndex(ui32DataSize);
     }
 
@@ -410,13 +495,13 @@ private:
 
         dataCount_t ui16Count(_isNextCount());
 
-        StypeInfos *sTypeInfos_vec(nullptr),
-                   *sTypeInfos_var(nullptr);
+        StypeInfos *sTypeInfos_vec(nullptr);
+        StypeInfos *sTypeInfos_var(nullptr);
         getTypeInfos_byName("std::vector", &sTypeInfos_vec);
         getTypeInfos_byType(U(), &sTypeInfos_var);
         _chkExpectedType({ sTypeInfos_vec->typeId(), sTypeInfos_var->typeId() });
 
-        uint32_t ui32DataSize(sTypeInfos_var->typeId() * ui16Count);
+        uint32_t ui32DataSize(sTypeInfos_var->size() * static_cast<uint32_t>(ui16Count));
         _vec.resize(ui16Count);
 
         ::memcpy(&_vec[0], &m_vecBuffer[m_iIndex], ui32DataSize);
@@ -470,32 +555,29 @@ private:
         _incrementIndex(ui32DataSize);
     }
 
-    /*template <typename T, size_t N>
+    template <typename T, size_t N>
     void _setNextData_template(const T(&_var)[N]) {
         _chkOperation(Eoperation_Set);
 
-        typeId_t   ui8TypeId(0);
-        typeSize_t ui32TypeSize(0);
-        getTypeInfos_byType(T(), &ui8TypeId, &ui32TypeSize, nullptr);
+        StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byType(_var[0], &sTypeInfos);
 
         int iCount(N);
-        _setHeader(iCount, { ui8TypeId });
+        _setHeader(iCount, { sTypeInfos->typeId()});
 
-        uint32_t ui32DataSize(ui32TypeSize * iCount);
+        uint32_t ui32DataSize(sTypeInfos->size() * iCount);
         _reserveBufferSize(ui32DataSize);
 
         ::memcpy(&m_vecBuffer[m_iIndex], _var, ui32DataSize);
         _incrementIndex(ui32DataSize);
-    }*/
+    }
 
     template<typename U>
     void _setNextData_template(const std::vector<U> &_vec) {
-        static_assert(!std::is_pointer<std::vector<U>>::value, "Pointer only.");
-
         _chkOperation(Eoperation_Set);
 
-        StypeInfos *sTypeInfos_vec(nullptr),
-                   *sTypeInfos_var(nullptr);
+        StypeInfos *sTypeInfos_vec(nullptr);
+        StypeInfos *sTypeInfos_var(nullptr);
         getTypeInfos_byName("std::vector", &sTypeInfos_vec);
         getTypeInfos_byType(_vec[0], &sTypeInfos_var);
 
@@ -511,8 +593,6 @@ private:
 
     /*template<typename U, typename V>
     void _setNextData_template(const std::map<U, V> *_map) {
-        static_assert(!std::is_pointer<std::map<U, V>>::value, "Pointer are forbidden, use the dereference operator.");
-
         _chkOperation(Eoperation_Set);
 
         typeId_t   ui8TypeId_map(0),
@@ -566,12 +646,12 @@ private:
         if constexpr (has_varInfos) {
             _chkOperation(Eoperation_Set);
 
-            /*typeId_t   ui8TypeId(0);
-            getTypeInfos_byType(_var, &ui8TypeId, nullptr, nullptr);
-            _setHeader(1, { ui8TypeId });*/
+            StypeInfos *sTypeInfos_UserStruct(nullptr);
+            getTypeInfos_byType(_var, &sTypeInfos_UserStruct);
+            _setHeader(1, { sTypeInfos_UserStruct->typeId() });
 
             for (int i(0); i < _var.__v.size(); ++i)
-                _setNextData_structvar_run(_var.__v[i]);
+                _setNextData_structvar_run(*_var.__v[i].get());
         }
         else
             return false;
@@ -579,37 +659,41 @@ private:
         return true;
     }
 
-    void _setNextData_structvar_run(const SvarInfo &_var) {
+    void _setNextData_structvar_run(const SvarInfo_base &_var) {
         if (_var.isInfoVec()) {
-            std::vector<Cserializing::SvarInfo> &vec = (*reinterpret_cast<std::vector<Cserializing::SvarInfo>*>(_var.ptr()));
-            for (int i(0); i < vec.size(); ++i)
-                _setNextData_structvar_run(vec[i]);
+            //std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> &vec = (*reinterpret_cast<std::vector<std::unique_ptr<Cserializing::SvarInfo_base>>>(_var.ptrNode()));
+            std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> *vec = reinterpret_cast<std::vector<std::unique_ptr<Cserializing::SvarInfo_base>>*>(_var.ptrNode());
+            
+            for (int i(0); i < vec->size(); ++i)
+                _setNextData_structvar_run(*vec->at(i).get());
         }
         else
             _setNextData_structvar_var(_var);
     }
 
-    void _setNextData_structvar_var(const SvarInfo &_var) {
+    void _setNextData_structvar_var(const SvarInfo_base &_var) {
         const std::string strTypeName(_var.typeIdsNames()[0]->typeName());
 
         if (strTypeName == "std::string") {
-            const std::string &str(reinterpret_cast<std::string &>(*reinterpret_cast<std::string *>(_var.ptr())));
-            _setNextData_template(str);
+            //const std::string &str(reinterpret_cast<std::string &>(*reinterpret_cast<std::string *>(_var.ptr())));
+            //_setNextData_template(str);
+            _var.ptrVar(this);
         }
         else if (strTypeName == "std::vector") {
-            using t = decltype(_var.typeIdsNames()[1]->type());
-            std::string str = _var.typeIdsNames()[1]->typeName();
+            //_var.populate(this);
+            _var.ptrVar(this);
 
-            std::vector<t> &vec(reinterpret_cast<std::vector<t> &>(*reinterpret_cast<std::vector<t> *>(_var.ptr())));
-            _setNextData_template(vec);
-            //const vecTypesIdsNames vec = _var.typeIdsNames();
-            //std::vector<int> &str = reinterpret_cast<std::vector<int> &>(*reinterpret_cast<std::vector<int> *>(_var.ptr()));
+            //using t = decltype(_var.typeIdsNames()[1]->type());
+
+            //std::vector<t> *vec(reinterpret_cast<std::vector<t>*>(_var.ptr()));
+            //_setNextData_template(*vec);
         }
         else if(strTypeName == "std::map") {
-
+            _var.ptrVar(this);
         }
         else {
-            dataCount_t ui16Count(_var.count());
+            _var.ptrVar(this);
+            /*dataCount_t ui16Count(_var.count());
             int iDataSize(_var.typeIdsNames()[0]->size() * ui16Count);
             _reserveBufferSize(sizeof(ui16Count) + iDataSize);
 
@@ -619,7 +703,7 @@ private:
             if (ui16Count > 0) {
                 ::memcpy(&m_vecBuffer[m_iIndex], _var.ptr(), iDataSize);
                 m_iIndex += iDataSize;
-            }
+            }*/
         }
     }
 
@@ -735,9 +819,9 @@ private:
 
     static mapTypesInfos_byName s_mapTypes_byName;
     static mapTypesInfos_byId   s_mapTypes_byId;
+    static std::atomic<bool>    s_bRegisterDone;
 };
 
 
-
 #define TEST2(VAR)  Cserializing::SvarInfo<decltype(VAR)>(VAR)
-#define TEST(...)   friend class Cserializing; protected: std::vector<Cserializing::SvarInfo> __v { ##__VA_ARGS__ }
+#define TEST(...)   friend class Cserializing; protected: std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> __v { Cserializing::__v_push(##__VA_ARGS__) };

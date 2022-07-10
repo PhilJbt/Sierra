@@ -2,3 +2,4 @@
 
 mapTypesInfos_byName Cserializing::s_mapTypes_byName;
 mapTypesInfos_byId   Cserializing::s_mapTypes_byId;
+std::atomic<bool>    Cserializing::s_bRegisterDone = false;

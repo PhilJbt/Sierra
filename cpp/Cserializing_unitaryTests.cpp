@@ -21,14 +21,22 @@
 
 struct Stest_child2 {
 public:
-    std::vector<int> vec = { 11, 33, 22 };
+    Stest_child2() {
+        NULL;
+    }
+
+    std::vector<uint8_t> vec = { 0, 127, 255 };
 
     TEST(vec);
 };
 
 struct Stest_child1 {
 public:
-    std::string str = "";
+    Stest_child1() {
+        NULL;
+    }
+
+    std::string str = "qzd";
 
     Stest_child2 s2;
 
@@ -46,9 +54,9 @@ public:
     Stest() {
     }
 
-    int   i = 0;
-    float f = .0f;
-    char  cz[5] { '\0' };
+    int   i = 1;
+    float f = 2.2f;
+    char  cz[5] { '3' };
 
     Stest_child1 s1;
 
@@ -60,8 +68,7 @@ public:
 *
 */
 void unitaryTests() {
-    Cserializing::initialization();
-    Cserializing::registerTypes(Stest());
+    Cserializing::initialization(Stest());
     //vector of vector of builtin_type
 
     //std::byte
@@ -263,6 +270,8 @@ void unitaryTests() {
         pe.changeOperationType(Cserializing::Eoperation_Get);
 
         Stest sB(0, .0f, "\0\0\0\0");
+        sB.s1.str = "";
+        sB.s1.s2.vec = std::vector<uint8_t>();
         if (!pe.nextDataType(sB)) throw std::runtime_error("IsNextData CUSTOM DATA STRUCTURE failed.");
         pe.getNextData(sB);
         if (SK_COMPARE_INT(sA.i, sB.i) || SK_COMPARE_FLT(sA.f, sB.f) || SK_COMPARE_CZ(sA.cz, sB.cz) || SK_COMPARE_STR(sA.s1.str, sB.s1.str) || SK_COMPARE_VEC(sA.s1.s2.vec, sB.s1.s2.vec))
