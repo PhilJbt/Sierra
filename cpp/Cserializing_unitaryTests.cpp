@@ -19,18 +19,24 @@
 #define SK_COMPARE_MAP(MAPA, MAPB) ((MAPA.size() != MAPB.size()) || (std::equal(MAPA.begin(), MAPA.end(), MAPB.begin()) != true))
 #define SK_COMPARE_STR(STRA, STRB) (STRA != STRB)
 
+struct Stest_child2 {
+public:
+    std::vector<int> vec = { 11, 33, 22 };
 
-struct Stest_child {
-    int i = 0;
-
-    TEST(i);
+    TEST(vec);
 };
 
-struct Stest_child2 {
-    int i = 0;
+struct Stest_child1 {
+public:
+    std::string str = "";
+
+    Stest_child2 s2;
+
+    TEST(str, s2);
 };
 
 struct Stest {
+public:
     Stest(int _i, float _f, std::string _str) {
         i = _i;
         f = _f;
@@ -41,12 +47,12 @@ struct Stest {
     }
 
     int   i = 0;
-    float f = 0;
+    float f = .0f;
     char  cz[5] { '\0' };
 
-    Stest_child s;
+    Stest_child1 s1;
 
-    TEST(i, f, cz, s);
+    TEST(i, f, cz, s1);
 };
 
 /*
@@ -55,7 +61,7 @@ struct Stest {
 */
 void unitaryTests() {
     Cserializing::initialization();
-
+    Cserializing::registerTypes(Stest());
     //vector of vector of builtin_type
 
     //std::byte
@@ -86,9 +92,9 @@ void unitaryTests() {
         pe.changeOperationType(Cserializing::Eoperation_Get);
 
         int64_t i64B(0);
-        if (pe.isNextData(i64B))
-            pe.getNextData(i64B);
-        if (SK_COMPARE_INT(i64A, i64B)) throw std::runtime_error("Get UINT64 failed.");
+        if (!pe.nextDataType(i64B)) throw std::runtime_error("IsNextData T failed.");
+        pe.getNextData(i64B);
+        if (SK_COMPARE_INT(i64A, i64B)) throw std::runtime_error("Get T failed.");
     }
 
     // T *
@@ -96,16 +102,21 @@ void unitaryTests() {
         Cserializing pe;
 
         int64_t *i64A(new int64_t(INT64_MIN));
-        pe.setNextData(i64A);
+        pe.setNextData(*i64A);
 
         pe.changeOperationType(Cserializing::Eoperation_Get);
 
         int64_t *i64B(new int64_t(0));
-        if (pe.isNextData(i64B))
-            pe.getNextData(i64B);
-        if (SK_COMPARE_INT((*i64A), (*i64B))) throw std::runtime_error("Get UINT64 * failed.");
+        if (!pe.nextDataType(*i64B)) throw std::runtime_error("IsNextData T * failed.");
+        pe.getNextData(*i64B);
+        if (SK_COMPARE_INT((*i64A), (*i64B))) throw std::runtime_error("Get T * failed.");
         delete i64A;
         delete i64B;
+    }
+    
+    // T [N]
+    {
+
     }
 
     // STD::VECTOR
@@ -118,8 +129,8 @@ void unitaryTests() {
         pe.changeOperationType(Cserializing::Eoperation_Get);
 
         std::vector<uint8_t> vecB;
-        if (pe.isNextData(vecB))
-            pe.getNextData(vecB);
+        if (!pe.nextDataType(vecB)) throw std::runtime_error("IsNextData STD::VECTOR failed.");
+        pe.getNextData(vecB);
         if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("Get STD::VECTOR failed.");
     }
 
@@ -128,18 +139,147 @@ void unitaryTests() {
         Cserializing pe;
 
         std::vector<uint8_t> *vecA(new std::vector<uint8_t>({ 11, 33, 22 }));
-        pe.setNextData(vecA);
+        pe.setNextData(*vecA);
 
         pe.changeOperationType(Cserializing::Eoperation_Get);
 
         std::vector<uint8_t> *vecB(new std::vector<uint8_t>());
-        if (pe.isNextData(vecB))
-            pe.getNextData(vecB);
+        if (!pe.nextDataType(*vecB)) throw std::runtime_error("IsNextData STD::VECTOR * failed.");
+        pe.getNextData(*vecB);
         if (SK_COMPARE_VEC((*vecA), (*vecB))) throw std::runtime_error("Get STD::VECTOR * failed.");
         delete vecA;
         delete vecB;
     }
 
+    // STD::VECTOR [N]
+    {
+
+    }
+
+    // SAME TYPE
+    {
+        Cserializing pe;
+
+        float fA(5.7f);
+        pe.setNextData(fA);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        double dB(.0);
+        if (pe.nextDataType(dB)) throw std::runtime_error("IsNextData FLT/DBL failed.");
+        float fB(.0f);
+        if (!pe.nextDataType(fB)) throw std::runtime_error("IsNextData FLT/DBL failed.");
+        pe.getNextData(fB);
+        if (SK_COMPARE_FLT(fA, fB)) throw std::runtime_error("Get FLT/DBL failed.");
+    }
+
+    // SAME TYPE *
+    {
+        Cserializing pe;
+
+        float *fA(new float(5.7f));
+        pe.setNextData(*fA);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        double *dB(new double(.0));
+        if (pe.nextDataType(*dB)) throw std::runtime_error("IsNextData FLT/DBL * failed.");
+        float *fB(new float(.0f));
+        if (!pe.nextDataType(*fB)) throw std::runtime_error("IsNextData FLT/DBL * failed.");
+        pe.getNextData(*fB);
+        if (SK_COMPARE_FLT((*fA), (*fB))) throw std::runtime_error("Get FLT/DBL * failed.");
+        delete fA;
+        delete dB;
+        delete fB;
+    }
+
+    // STD::STRING
+    {
+
+    }
+    
+    // STD::STRING *
+    {
+        Cserializing pe;
+
+        std::string *strA(new std::string);
+        *strA = "oYfgi2libM";
+        pe.setNextData(*strA);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        std::string *strB(new std::string);
+        if (!pe.nextDataType(*strB)) throw std::runtime_error("IsNextData STD::STRING * failed.");
+        pe.getNextData(*strB);
+        if (SK_COMPARE_STR(*strA, *strB)) throw std::runtime_error("Get STD::STRING * failed.");
+        delete strA;
+        delete strB;
+    }
+
+    // STD::STRING [N]
+    {
+
+    }
+    
+    // STD::WSTRING
+    {
+
+    }
+
+    // STD::WSTRING *
+    {
+
+    }
+
+    // STD::WSTRING [N]
+    {
+
+    }
+
+    // STD::MAP
+    {
+
+    }
+
+    // STD::MAP *
+    {
+
+    }
+
+    // STD::MAP [N]
+    {
+
+    }
+
+    // CUSTOM DATA STRUCTURE
+    {
+        Cserializing pe;
+
+        Stest sA(9, 8.7f, "zyxw");
+        sA.s1.str = "v5xA9QyJAQ";
+        sA.s1.s2.vec = { 22, 11, 33 };
+        pe.setNextData(sA);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        Stest sB(0, .0f, "\0\0\0\0");
+        if (!pe.nextDataType(sB)) throw std::runtime_error("IsNextData CUSTOM DATA STRUCTURE failed.");
+        pe.getNextData(sB);
+        if (SK_COMPARE_INT(sA.i, sB.i) || SK_COMPARE_FLT(sA.f, sB.f) || SK_COMPARE_CZ(sA.cz, sB.cz) || SK_COMPARE_STR(sA.s1.str, sB.s1.str) || SK_COMPARE_VEC(sA.s1.s2.vec, sB.s1.s2.vec))
+            throw std::runtime_error("Get CUSTOM DATA STRUCTURE failed.");
+    }
+
+    /// CUSTOM DATA STRUCTURE *
+    {
+
+    }
+
+    // CUSTOM DATA STRUCTURE [N]
+    {
+
+    }
+
+    Cserializing::desinitialisation();
 
 
     /*

@@ -12,11 +12,33 @@
 
 
 
+struct StypeInfos;
 
 typedef uint8_t  typeId_t;
 typedef uint32_t typeSize_t;
 typedef uint16_t dataCount_t;
-typedef std::unordered_map<std::string, typeSize_t> mapTypesInfos;
+typedef std::unordered_map<std::string, StypeInfos*>    mapTypesInfos_byName;
+typedef std::unordered_map<typeId_t,    StypeInfos*>    mapTypesInfos_byId;
+typedef std::vector<StypeInfos*>                        vecTypesIdsNames;
+
+
+
+struct StypeInfos {
+public:
+    StypeInfos(std::type_index _type, typeId_t _ui8TypeId, typeSize_t _ui32Size, std::string _strTypeName)
+        : m_ui8TypeId(_ui8TypeId), m_ui32Size(_ui32Size), m_type(_type), m_strTypeName(_strTypeName) {}
+    typeId_t        typeId()   { return m_ui8TypeId; };
+    typeSize_t      size()     { return m_ui32Size;  };
+    std::string     typeName() { return m_strTypeName; };
+    std::type_index type()     { return m_type;  };
+private:
+    typeId_t        m_ui8TypeId   = 0;
+    typeSize_t      m_ui32Size    = 0;
+    std::string     m_strTypeName = "";
+    std::type_index m_type        = typeid(void);
+};
+
+
 
 /*
 ** 
@@ -28,6 +50,19 @@ public:
     public:
         template <typename T>
         SvarInfo(T &_var) {
+            if (!_isVarNode(_var))
+                _storeVar(_var);
+        }
+
+
+        const vecTypesIdsNames & typeIdsNames() const { return m_vecTypeIdsName; }
+        dataCount_t        count()        const { return m_ui16Count; }
+        void             * ptr()          const { return m_ptr; }
+        bool               isInfoVec()    const { return m_bIsVarInfosVec; }
+
+    private:
+        template <typename T>
+        bool _isVarNode(T &_var) {
             constexpr bool has_varInfos = requires(T & _var) {
                 _var.__v;
             };
@@ -36,45 +71,59 @@ public:
                 m_ptr = &_var.__v;
                 m_bIsVarInfosVec = true;
             }
-            else {
-                if (isTypeRegistered_byType(T())) {
-                    getTypeInfos_byType(_var, &m_ui8TypeId, &m_ui32Size);
-                    m_ptr = &_var;
-                    m_ui16Count = 1;
-                }
-                else
-                    throw std::runtime_error("Type not yet registered.");
-            }
+            else
+                return false;
+
+            return true;
+        }
+
+        template <typename T>
+        void _storeVar(T &_var) {
+            StypeInfos *sTypeInfos(nullptr);
+            Cserializing::getTypeInfos_byType(T(), &sTypeInfos);
+            m_vecTypeIdsName.push_back(sTypeInfos);
+
+            m_ptr = &_var;
+            m_ui16Count = 1;
         }
 
         template <typename T, size_t N>
-        SvarInfo(T(&_var)[N]) {
-            constexpr bool has_varInfos = requires(T & _var) {
-                _var.__v;
-            };
+        void _storeVar(T(&_var)[N]) {
+            StypeInfos *sTypeInfos(nullptr);
+            Cserializing::getTypeInfos_byType(_var[0], &sTypeInfos);
+            m_vecTypeIdsName.push_back(sTypeInfos);
 
-            if constexpr (has_varInfos) {
-                m_ptr = &_var.__v;
-                m_bIsVarInfosVec = true;
-            }
-            else {
-                if (isTypeRegistered_byType(T())) {
-                    getTypeInfos_byType(_var[0], &m_ui8TypeId, &m_ui32Size);
-                    m_ptr = &_var;
-                    m_ui16Count = N;
-                }
-                else
-                    throw std::runtime_error("Type not yet registered.");
-            }
+            m_ptr = &_var;
+            m_ui16Count = N;
         }
 
-        typeId_t     m_ui8TypeId      = 0;
-        typeSize_t   m_ui32Size       = 0;
-        dataCount_t  m_ui16Count      = 0;
-        void        *m_ptr            = nullptr;
-        bool         m_bIsVarInfosVec = false;
-    };
+        void _storeVar(std::string &_str) {
+            StypeInfos *sTypeInfos(nullptr);
+            Cserializing::getTypeInfos_byName("std::string", &sTypeInfos);
+            m_vecTypeIdsName.push_back(sTypeInfos);
 
+            m_ptr = &_str;
+            m_ui16Count = static_cast<dataCount_t>(_str.length());
+        }
+
+        template <typename U>
+        void _storeVar(std::vector<U> &_vec) {
+            StypeInfos *sTypeInfos_vec(nullptr),
+                       *sTypeInfos_var(nullptr);
+            Cserializing::getTypeInfos_byName("std::vector", &sTypeInfos_vec);
+            Cserializing::getTypeInfos_byType(_vec[0], &sTypeInfos_var);
+            m_vecTypeIdsName.push_back(sTypeInfos_vec);
+            m_vecTypeIdsName.push_back(sTypeInfos_var);
+
+            m_ptr = &_vec;
+            m_ui16Count = static_cast<dataCount_t>(_vec.size());
+        }
+
+        vecTypesIdsNames  m_vecTypeIdsName;
+        dataCount_t       m_ui16Count      = 0;
+        void             *m_ptr            = nullptr;
+        bool              m_bIsVarInfosVec = false;
+    };
 
 
     enum Eoperation_ {
@@ -86,84 +135,61 @@ public:
 
 
     template<typename T>
-    bool isNextData(const T &_var, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
-        typeId_t ui8TypeId(0);
-        getTypeInfos_byType(_var, &ui8TypeId, nullptr);
-
-        return _isNextData(false, ui8TypeId);
+    bool nextDataType(const T &_var, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
+        return _nextDataType(_var);
     }
 
-    template <typename T>
-    bool isNextData(const T _var, int _iCount = 1, typename std::enable_if<std::is_pointer<T>::value >::type* = 0) {
-        typeId_t ui8TypeId(0);
-        getTypeInfos_byType(_var[0], &ui8TypeId, nullptr);
+    bool _nextDataType(const std::string &_str) {
+        StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byName("std::string", &sTypeInfos);
 
-        return _isNextData(false, ui8TypeId) && (static_cast<dataCount_t>(_iCount) == static_cast<dataCount_t>(isNextCount()));
+        return _isNextData(false, { sTypeInfos->typeId() });
+    }
+
+    template<typename U>
+    bool _nextDataType(const std::vector<U> &_vec) {
+        StypeInfos *sTypeInfos_vec(nullptr),
+                   *sTypeInfos_var(nullptr);
+        getTypeInfos_byName("std::vector", &sTypeInfos_vec);
+        getTypeInfos_byType(U(), &sTypeInfos_var);
+
+        return _isNextData(false, { sTypeInfos_vec->typeId(), sTypeInfos_var->typeId() });
+    }
+
+    template<typename T>
+    bool _nextDataType(const T &_var) {
+        StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byType(_var, &sTypeInfos);
+
+        return _isNextData(false, { sTypeInfos->typeId() });
     }
 
     /*template <typename T, size_t N>
-    bool isNextData(T(&_var)[N]) {
+    bool _nextDataType(T(&_var)[N]) {
         typeId_t ui8TypeId(0);
-        getTypeInfos_byType(_var[0], &ui8TypeId, nullptr);
+        getTypeInfos_byType(_var[0], &ui8TypeId, nullptr, nullptr);
 
         return _isNextData(false, ui8TypeId) && (static_cast<dataCount_t>(N) == static_cast<dataCount_t>(isNextCount()));
     }*/
 
-    /*template <typename T>
-    bool isNextData(const T _str, typename std::enable_if<std::is_same<T, std::string>::value && !std::is_pointer<T>::value>::type* = 0) {
-        typeId_t ui8TypeId(0);
-        getTypeInfos_byType(_str[0], &ui8TypeId, nullptr);
 
-        return _isNextData(false, ui8TypeId);
-    }*/
-
-    template<typename U>
-    bool isNextData(std::vector<U> &_vec) {
-        return isNextData(&_vec);
-    }
-
-    template<typename U>
-    bool isNextData(std::vector<U> *_vec) {
-        typeId_t ui8VectId(0),
-                 ui8TypeId(0);
-        getTypeInfos_byName("std::vector", &ui8VectId, nullptr);
-        getTypeInfos_byType(U(), &ui8TypeId, nullptr);
-
-        return _isNextData(false, ui8VectId, ui8TypeId);
-    }
-
-
-    int isNextCount() {
+    int nextDataSize() {
         dataCount_t ui16Count(0);
         ::memcpy(&ui16Count, &m_vecBuffer[m_iIndex], sizeof(ui16Count));
         return static_cast<int>(ui16Count);
     }
-    
-
-    template <typename T>
-    void setNextData(const T _var, typename std::enable_if<std::is_pointer<T>::value >::type* = 0) {
-        _setNextData(_var);
-    }
-
-    template <typename T>
-    void setNextData(const T _var, int const _iCount, typename std::enable_if<std::is_pointer<T>::value >::type* = 0) {
-        _setNextData(_var, _iCount);
-    }
-
-    template <typename T>
-    void setNextData(const T &_var, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
-        _setNextData(&_var);
-    }
 
 
     template<typename T>
-    void getNextData(T _var, typename std::enable_if<std::is_pointer<T>::value>::type* = 0) {
-        _getNextData_template(_var);
+    void setNextData(const T &_var, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
+        if (!_setNextData_structvar(_var))
+            _setNextData_template(_var);
     }
+
 
     template<typename T>
     void getNextData(T &_var, typename std::enable_if<!std::is_pointer<T>::value>::type* = 0) {
-        _getNextData_template(&_var);
+        _getNextData_template(_var);
     }
 
 
@@ -178,54 +204,48 @@ public:
     /*template <typename T, size_t N>
     inline static bool isTypeRegistered(const T(&_t)[N]) {
         std::string strTypeName(std::type_index(typeid(const_cast<T &>(_t[0]))).name());
-        return s_mapTypes.find(strTypeName) != s_mapTypes.end();
+        return s_mapTypes_byName.find(strTypeName) != s_mapTypes_byName.end();
     }*/
 
     template<typename T>
     inline static bool isTypeRegistered_byType(const T &_t, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
         std::string strTypeName(std::type_index(typeid(const_cast<T &>(_t))).name());
-        return s_mapTypes.find(strTypeName) != s_mapTypes.end();
+        return s_mapTypes_byName.find(strTypeName) != s_mapTypes_byName.end();
     }
 
     template<typename T>
     inline static bool isTypeRegistered_byType(const T _t, typename std::enable_if<std::is_pointer<T>::value >::type* = 0) {
         std::string strTypeName(std::type_index(typeid(const_cast<T &>(_t))).name());
-        return s_mapTypes.find(strTypeName) != s_mapTypes.end();
+        return s_mapTypes_byName.find(strTypeName) != s_mapTypes_byName.end();
     }
 
     template<typename T>
     inline static bool isTypeRegistered_byName(const T &_strTypeName, typename std::enable_if<std::is_same<T, std::string>::value && !std::is_pointer<T>::value >::type* = 0) {
-        return s_mapTypes.find(_strTypeName) != s_mapTypes.end();
+        return s_mapTypes_byName.find(_strTypeName) != s_mapTypes_byName.end();
     }
 
 
     template<typename T>
-    static void getTypeInfos_byType(const T &_t, typeId_t *_out_ui8TypeId, typeSize_t *_out_ui32TypeSize) {
+    static void getTypeInfos_byType(const T &_t, StypeInfos **_out_sTypeInfos) {
         std::string strTypeName(std::type_index(typeid(const_cast<T &>(_t))).name());
         if (!isTypeRegistered_byName(strTypeName))
             throw std::runtime_error("Type not registered");
-        const mapTypesInfos::iterator &&itElem(s_mapTypes.find(strTypeName));
+        const mapTypesInfos_byName::iterator &&itElem(s_mapTypes_byName.find(strTypeName));
         
-        if (_out_ui8TypeId != nullptr)
-            *_out_ui8TypeId = static_cast<typeId_t>(std::distance(s_mapTypes.begin(), itElem)) + 1;
-        if (_out_ui32TypeSize != nullptr)
-            *_out_ui32TypeSize = itElem->second;
+        *_out_sTypeInfos = itElem->second;
     }
 
-    static void getTypeInfos_byName(std::string _strTypeName, typeId_t *_out_ui8TypeId, typeSize_t *_out_ui32TypeSize) {
+    static void getTypeInfos_byName(std::string _strTypeName, StypeInfos **_out_sTypeInfos) {
         if (!isTypeRegistered_byName(_strTypeName))
             throw std::runtime_error("Type not registered");
-        const mapTypesInfos::iterator &&itElem(s_mapTypes.find(_strTypeName));
+        const mapTypesInfos_byName::iterator &&itElem(s_mapTypes_byName.find(_strTypeName));
 
-        if (_out_ui8TypeId != nullptr)
-            *_out_ui8TypeId = static_cast<typeId_t>(std::distance(s_mapTypes.begin(), itElem)) + 1;
-        if (_out_ui32TypeSize != nullptr)
-            *_out_ui32TypeSize = itElem->second;
+        *_out_sTypeInfos = itElem->second;
     }
 
 
     static void initialization() {
-        _registerTypes(
+        registerTypes(
             bool(),
             int8_t(), char(), signed char(),
             int16_t(), short(), short int(), signed short int(),
@@ -244,29 +264,59 @@ public:
         _registerType_force("std::map");
     }
 
-private:
     template <typename... T>
-    static void _registerTypes(T&&... args) {
+    static void registerTypes(T&&... args) {
         (_registerType_unpack(args), ...);
     }
 
+    static void desinitialisation() {
+        for (auto &&elem : s_mapTypes_byName)
+            delete elem.second;
+
+        s_mapTypes_byName.clear();
+        s_mapTypes_byId.clear();
+    }
+
+private:
     template<typename T>
     static void _registerType_unpack(const T &_t) {
-        typeSize_t ui32Size(sizeof(_t));
+        typeId_t         ui8TypeId(static_cast<typeId_t>(s_mapTypes_byName.size()) + 1);
+        typeSize_t       ui32Size(sizeof(_t));
+        std::type_index  type(typeid(_t));
+        std::string      strTypeName(typeid(_t).name());
+        StypeInfos      *sTemp(new StypeInfos(type, ui8TypeId, ui32Size, strTypeName));
 
-        s_mapTypes.insert(
+        s_mapTypes_byId.insert(
+            {
+                ui8TypeId,
+                sTemp
+            }
+        );
+
+        s_mapTypes_byName.insert(
             {
                 std::type_index(typeid(_t)).name(),
-                ui32Size
+                sTemp
             }
         );
     }
 
     static void _registerType_force(std::string _str, const typeSize_t &_ui32Size = 0) {
-        s_mapTypes.insert(
+        typeId_t         ui8TypeId(static_cast<typeId_t>(s_mapTypes_byName.size()) + 1);
+        std::type_index  type(typeid(void));
+        StypeInfos      *sTemp(new StypeInfos(type, ui8TypeId, _ui32Size, _str));
+
+        s_mapTypes_byId.insert(
+            {
+                ui8TypeId,
+                sTemp
+            }
+        );
+
+        s_mapTypes_byName.insert(
             {
                 _str,
-                _ui32Size
+                sTemp
             }
         );
     }
@@ -281,7 +331,7 @@ private:
         if constexpr (has_varInfos) {
             for (int i(0); i < _var.__v.size(); ++i) {
                 if (_var.__v[i].m_bIsVarInfosVec) {
-                    std::vector<Cserializing::SvarInfo> &vec = (*reinterpret_cast<std::vector<Cserializing::SvarInfo>*>(_var.__v[i].m_ptr));
+                    std::vector<Cserializing::SvarInfo> &vec = (*reinterpret_cast<std::vector<Cserializing::SvarInfo>*>(_var.__v[i].ptr()));
                     for (int i(0); i < vec.size(); ++i)
                         _getNextData_varInfo(vec[i]);
                 }
@@ -293,19 +343,19 @@ private:
             _getNextData_var(_var);
     }
 
-    void _getNextData_varInfo(SvarInfo &_ptr) {
+    void _getNextData_varInfo(const SvarInfo &_ptr) {
         _chkOperation(Eoperation_Get);
 
         m_iIndex += sizeof(typeId_t);
 
         dataCount_t ui16Count(_isNextCount());
-        uint32_t    ui32DataSize(_ptr.m_ui32Size * ui16Count);
+        uint32_t    ui32DataSize(_ptr.typeIdsNames()[0]->size() * ui16Count);
 
-        ::memcpy(_ptr.m_ptr, &m_vecBuffer[m_iIndex], ui32DataSize);
+        ::memcpy(_ptr.ptr(), &m_vecBuffer[m_iIndex], ui32DataSize);
         _incrementIndex(ui32DataSize);
     }
 
-    template <typename T, size_t N>
+    /*template <typename T, size_t N>
     void _getNextData_template(const T(&_var)[N]) {
         _chkOperation(Eoperation_Get);
 
@@ -313,102 +363,79 @@ private:
 
         typeId_t   ui8TypeId(0);
         typeSize_t ui32TypeSize(0);
-        _getTypeInfos_byType(T(), &ui8TypeId, &ui32TypeSize);
+        getTypeInfos_byType(T(), &ui8TypeId, &ui32TypeSize, nullptr);
         _chkExpectedType(ui8TypeId);
 
         uint32_t ui32DataSize(ui32TypeSize * ui16Count);
 
         ::memcpy(_var, &m_vecBuffer[m_iIndex], ui32DataSize);
         _incrementIndex(ui32DataSize);
-    }
+    }*/
 
+    template<typename T>
+    void _getNextData_template(T &_var) {
+        _chkOperation(Eoperation_Get);
+
+        dataCount_t ui16Count(_isNextCount());
+
+        StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byType(T(), &sTypeInfos);
+        _chkExpectedType({ sTypeInfos->typeId() });
+
+        uint32_t ui32DataSize(sTypeInfos->size() * ui16Count);
+
+        ::memcpy((void *)&_var, &m_vecBuffer[m_iIndex], ui32DataSize);
+        _incrementIndex(ui32DataSize);
+    }
+    
     void _getNextData_template(std::string &_var) {
         _chkOperation(Eoperation_Get);
 
         dataCount_t ui16Count(_isNextCount());
 
-        typeId_t   ui8TypeId(0);
-        typeSize_t ui32TypeSize(0);
-        _getTypeInfos_byType(_var[0], &ui8TypeId, &ui32TypeSize);
-        _chkExpectedType(ui8TypeId);
+        StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byName("std::string", &sTypeInfos);
+        _chkExpectedType({ sTypeInfos->typeId() });
 
-        uint32_t ui32DataSize(ui32TypeSize * ui16Count);
+        uint32_t ui32DataSize(sTypeInfos->size() * ui16Count);
 
         _var = std::string(reinterpret_cast<char*>(&m_vecBuffer[m_iIndex]), ui32DataSize);
 
         _incrementIndex(ui32DataSize);
     }
 
-    template<typename T>
-    void _getNextData_template(T *_var) {
-        _chkOperation(Eoperation_Get);
-
-        dataCount_t ui16Count(_isNextCount());
-
-        typeId_t   ui8TypeId(0);
-        typeSize_t ui32TypeSize(0);
-        _getTypeInfos_byType(T(), &ui8TypeId, &ui32TypeSize);
-        _chkExpectedType(ui8TypeId);
-
-        uint32_t ui32DataSize(ui32TypeSize * ui16Count);
-
-        ::memcpy(_var, &m_vecBuffer[m_iIndex], ui32DataSize);
-        _incrementIndex(ui32DataSize);
-    }
-
-    template<typename U>
-    void _getNextData_template(std::vector<U> *_vec) {
-        _getNextData_vec(_vec);
-    }
-
     template<typename U>
     void _getNextData_template(std::vector<U> &_vec) {
-        _getNextData_vec(&_vec);
-    }
-
-    template<typename U>
-    void _getNextData_vec(std::vector<U> *_vec) {
         _chkOperation(Eoperation_Get);
 
         dataCount_t ui16Count(_isNextCount());
 
-        typeId_t   ui8TypeId(0),
-                   ui8VecId(0);
-        typeSize_t ui32TypeSize(0);
-        _getTypeInfos_byName("std::vector", &ui8VecId, nullptr);
-        _getTypeInfos_byType(U(), &ui8TypeId, &ui32TypeSize);
-        _chkExpectedType(ui8VecId, ui8TypeId);
+        StypeInfos *sTypeInfos_vec(nullptr),
+                   *sTypeInfos_var(nullptr);
+        getTypeInfos_byName("std::vector", &sTypeInfos_vec);
+        getTypeInfos_byType(U(), &sTypeInfos_var);
+        _chkExpectedType({ sTypeInfos_vec->typeId(), sTypeInfos_var->typeId() });
 
-        uint32_t ui32DataSize(ui32TypeSize * ui16Count);
-        _vec->resize(ui16Count);
+        uint32_t ui32DataSize(sTypeInfos_var->typeId() * ui16Count);
+        _vec.resize(ui16Count);
 
-        ::memcpy(&(*_vec)[0], &m_vecBuffer[m_iIndex], ui32DataSize);
+        ::memcpy(&_vec[0], &m_vecBuffer[m_iIndex], ui32DataSize);
         _incrementIndex(ui32DataSize);
-    }
-
-    template<typename U, typename V>
-    void _getNextData_template(std::map<U, V> *_map) {
-        _getNextData_map(_map);
     }
 
     template<typename U, typename V>
     void _getNextData_template(std::map<U, V> &_map) {
-        _getNextData_map(&_map);
-    }
-
-    template<typename U, typename V>
-    void _getNextData_map(std::map<U, V> *_map) {
         _chkOperation(Eoperation_Get);
 
         dataCount_t ui16Count(_isNextCount());
 
-        typeId_t ui8TypeId_map(0),
-                 ui8TypeId_var1(0),
-                 ui8TypeId_var2(0);
-        _getTypeInfos_byName("std::map", &ui8TypeId_map, nullptr);
-        _getTypeInfos_byType(U(), &ui8TypeId_var1, nullptr);
-        _getTypeInfos_byType(V(), &ui8TypeId_var2, nullptr);
-        _chkExpectedType(ui8TypeId_map, ui8TypeId_var1, ui8TypeId_var2);
+        StypeInfos *sTypeInfos_map(nullptr),
+                   *sTypeInfos_var1(nullptr),
+                   *sTypeInfos_var2(nullptr);
+        getTypeInfos_byName("std::map", &sTypeInfos_map);
+        getTypeInfos_byType(U(), &sTypeInfos_var1);
+        getTypeInfos_byType(V(), &sTypeInfos_var2);
+        _chkExpectedType({ sTypeInfos_map->typeId(), sTypeInfos_var1->typeId(), sTypeInfos_var2->typeId() });
 
         typeSize_t ui32SizeType1(sizeof(U)),
                    ui32SizeType2(sizeof(V));
@@ -422,69 +449,25 @@ private:
             ::memcpy(&val, &m_vecBuffer[m_iIndex], ui32SizeType2);
             _incrementIndex(ui32SizeType2);
 
-            _map->insert({ key, val });
+            _map.insert({ key, val });
         }
     }
 
-
-    /*template<typename T>
-    void _setNextData(const T *_var, int _iCount) {
-        static_assert(std::is_pointer<T *>::value, "Pointers only.");
-
-        constexpr bool has_varInfos = requires(T * _var) {
-            _var->__v;
-        };
-
-        if constexpr (has_varInfos) {
-            for (int i(0); i < _var->__v.size(); ++i)
-                _setNextData_structvar(_var->__v[i]);
-        }
-        else
-            _setNextData_template(_var, _iCount);
-    }*/
-
-    template<typename T>
-    void _setNextData(const T *_var) {
-        static_assert(std::is_pointer<T *>::value, "Pointers only.");
-
-        constexpr bool has_varInfos = requires(T * _var) {
-            _var->__v;
-        };
-
-        if constexpr (has_varInfos) {
-            for (int i(0); i < _var->__v.size(); ++i)
-                _setNextData_structvar(_var->__v[i]);
-        }
-        else
-            _setNextData_template(_var);
-    }
 
     template <typename T>
-    void _setNextData_var(const T *_var, const int &_iCount) {
+    void _setNextData_template(const T &_var, const int &_iCount = 1) {
         _chkOperation(Eoperation_Set);
 
-        typeId_t   ui8TypeId(0);
-        typeSize_t ui32TypeSize(0);
-        _getTypeInfos_byType(T(), &ui8TypeId, &ui32TypeSize);
+        StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byType(T(), &sTypeInfos);
 
-        int iCount(_iCount);
-        _setHeader(iCount, { ui8TypeId });
+        _setHeader(_iCount, { sTypeInfos->typeId()});
 
-        uint32_t ui32DataSize(ui32TypeSize * iCount);
+        uint32_t ui32DataSize(sTypeInfos->size() * _iCount);
         _reserveBufferSize(ui32DataSize);
 
-        ::memcpy(&m_vecBuffer[m_iIndex], _var, ui32DataSize);
+        ::memcpy(&m_vecBuffer[m_iIndex], &_var, ui32DataSize);
         _incrementIndex(ui32DataSize);
-    }
-
-    template <typename T>
-    void _setNextData_template(const T *_var) {
-        _setNextData_var(_var, 1);
-    }
-
-    template <typename T>
-    void _setNextData_template(const T *_var, const int &_iCount) {
-        _setNextData_var(_var, _iCount);
     }
 
     /*template <typename T, size_t N>
@@ -493,7 +476,7 @@ private:
 
         typeId_t   ui8TypeId(0);
         typeSize_t ui32TypeSize(0);
-        _getTypeInfos_byType(T(), &ui8TypeId, &ui32TypeSize);
+        getTypeInfos_byType(T(), &ui8TypeId, &ui32TypeSize, nullptr);
 
         int iCount(N);
         _setHeader(iCount, { ui8TypeId });
@@ -506,24 +489,23 @@ private:
     }*/
 
     template<typename U>
-    void _setNextData_template(const std::vector<U> *_vec) {
+    void _setNextData_template(const std::vector<U> &_vec) {
         static_assert(!std::is_pointer<std::vector<U>>::value, "Pointer only.");
 
         _chkOperation(Eoperation_Set);
 
-        typeId_t   ui8TypeId_vec(0),
-            ui8TypeId_var(0);
-        typeSize_t ui32TypeSize_var(0);
-        _getTypeInfos_byName("std::vector", &ui8TypeId_vec, nullptr);
-        _getTypeInfos_byType(U(), &ui8TypeId_var, &ui32TypeSize_var);
+        StypeInfos *sTypeInfos_vec(nullptr),
+                   *sTypeInfos_var(nullptr);
+        getTypeInfos_byName("std::vector", &sTypeInfos_vec);
+        getTypeInfos_byType(_vec[0], &sTypeInfos_var);
 
-        int iCount(static_cast<int>(_vec->size()));
-        _setHeader(iCount, { ui8TypeId_vec, ui8TypeId_var });
+        int iCount(static_cast<int>(_vec.size()));
+        _setHeader(iCount, { sTypeInfos_vec->typeId(), sTypeInfos_var->typeId() });
 
-        uint32_t ui32DataSize(ui32TypeSize_var * iCount);
+        uint32_t ui32DataSize(sTypeInfos_var->size() * iCount);
         _reserveBufferSize(ui32DataSize);
 
-        ::memcpy(&m_vecBuffer[m_iIndex], &(*_vec)[0], ui32DataSize);
+        ::memcpy(&m_vecBuffer[m_iIndex], &_vec[0], ui32DataSize);
         _incrementIndex(ui32DataSize);
     }
 
@@ -537,9 +519,9 @@ private:
                    ui8TypeId_var1(0),
                    ui8TypeId_var2(0);
         typeSize_t ui32Count(0);
-        _getTypeInfos_byName("std::map", &ui8TypeId_map, &ui32Count);
-        _getTypeInfos_byType(U(), &ui8TypeId_var1, &ui32Count);
-        _getTypeInfos_byType(V(), &ui8TypeId_var2, &ui32Count);
+        getTypeInfos_byName("std::map", &ui8TypeId_map, &ui32Count, nullptr);
+        getTypeInfos_byType(U(), &ui8TypeId_var1, &ui32Count, nullptr);
+        getTypeInfos_byType(V(), &ui8TypeId_var2, &ui32Count, nullptr);
 
         typeSize_t ui32SizeType1(sizeof(U)),
                    ui32SizeType2(sizeof(V));
@@ -557,60 +539,88 @@ private:
         }
     }*/
 
-    /*template <typename T>
-    void _setNextData_template(const std::string *_var) {
+    void _setNextData_template(const std::string &_str) {
         _chkOperation(Eoperation_Set);
 
-        std::string str(_var->c_str() + '\0');
+        std::string str(_str.c_str() + '\0');
 
-        typeId_t   ui8TypeId(0);
-        typeSize_t ui32CharSize(0);
-        _getTypeInfos_byType(str[0], &ui8TypeId, &ui32CharSize);
+        StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byName("std::string", &sTypeInfos);
 
-        typeSize_t ui32TypeSize(static_cast<int>(str.length()) * ui32CharSize);
+        typeSize_t ui32TypeSize(static_cast<int>(str.length()) * sTypeInfos->size());
 
-        _setHeader(ui32TypeSize - 1, { ui8TypeId });
+        _setHeader(ui32TypeSize, { sTypeInfos->typeId()});
 
         _reserveBufferSize(ui32TypeSize);
 
         ::memcpy(&m_vecBuffer[m_iIndex], &str[0], ui32TypeSize);
         _incrementIndex(ui32TypeSize);
-    }*/
-
-    /*void _setNextData_structvar(const SvarInfo &_ptr) {
-        if (_ptr.m_bIsVarInfosVec) {
-            std::vector<Cserializing::SvarInfo> &vec = (*reinterpret_cast<std::vector<Cserializing::SvarInfo>*>(_ptr.m_ptr));
-            for (int i(0); i < vec.size(); ++i)
-                _setNextData_structvar(vec[i]);
-        }
-        else
-            _setNextData_structvar_var(_ptr);
-    }*/
-
-    /*void _setNextData_structvar_var(const SvarInfo &_ptr) {
-        _chkOperation(Eoperation_Set);
-
-        int iArrOrVarSize(_ptr.m_ui32Size * _ptr.m_ui16Count);
-        _reserveBufferSize(sizeof(_ptr.m_ui8TypeId) + sizeof(_ptr.m_ui16Count) + iArrOrVarSize);
-
-        ::memcpy(&m_vecBuffer[m_iIndex], &_ptr.m_ui8TypeId, sizeof(_ptr.m_ui8TypeId));
-        m_iIndex += sizeof(_ptr.m_ui8TypeId);
-
-        ::memcpy(&m_vecBuffer[m_iIndex], &_ptr.m_ui16Count, sizeof(_ptr.m_ui16Count));
-        m_iIndex += sizeof(_ptr.m_ui16Count);
-
-        ::memcpy(&m_vecBuffer[m_iIndex], _ptr.m_ptr, iArrOrVarSize);
-        m_iIndex += iArrOrVarSize;
-    }*/
-
-
-    void _getTypeInfos_byName(const std::string _strTypeName, typeId_t *_out_ui8TypeId, typeSize_t *_out_ui32TypeSize) {
-        getTypeInfos_byName(_strTypeName, _out_ui8TypeId, _out_ui32TypeSize);
     }
 
     template<typename T>
-    void _getTypeInfos_byType(const T &_t, typeId_t *_out_ui8TypeId, typeSize_t *_out_ui32TypeSize) {
-        getTypeInfos_byType(_t, _out_ui8TypeId, _out_ui32TypeSize);
+    bool _setNextData_structvar(const T &_var) {
+        constexpr bool has_varInfos = requires(T &_var) {
+            _var.__v;
+        };
+
+        if constexpr (has_varInfos) {
+            _chkOperation(Eoperation_Set);
+
+            /*typeId_t   ui8TypeId(0);
+            getTypeInfos_byType(_var, &ui8TypeId, nullptr, nullptr);
+            _setHeader(1, { ui8TypeId });*/
+
+            for (int i(0); i < _var.__v.size(); ++i)
+                _setNextData_structvar_run(_var.__v[i]);
+        }
+        else
+            return false;
+
+        return true;
+    }
+
+    void _setNextData_structvar_run(const SvarInfo &_var) {
+        if (_var.isInfoVec()) {
+            std::vector<Cserializing::SvarInfo> &vec = (*reinterpret_cast<std::vector<Cserializing::SvarInfo>*>(_var.ptr()));
+            for (int i(0); i < vec.size(); ++i)
+                _setNextData_structvar_run(vec[i]);
+        }
+        else
+            _setNextData_structvar_var(_var);
+    }
+
+    void _setNextData_structvar_var(const SvarInfo &_var) {
+        const std::string strTypeName(_var.typeIdsNames()[0]->typeName());
+
+        if (strTypeName == "std::string") {
+            const std::string &str(reinterpret_cast<std::string &>(*reinterpret_cast<std::string *>(_var.ptr())));
+            _setNextData_template(str);
+        }
+        else if (strTypeName == "std::vector") {
+            using t = decltype(_var.typeIdsNames()[1]->type());
+            std::string str = _var.typeIdsNames()[1]->typeName();
+
+            std::vector<t> &vec(reinterpret_cast<std::vector<t> &>(*reinterpret_cast<std::vector<t> *>(_var.ptr())));
+            _setNextData_template(vec);
+            //const vecTypesIdsNames vec = _var.typeIdsNames();
+            //std::vector<int> &str = reinterpret_cast<std::vector<int> &>(*reinterpret_cast<std::vector<int> *>(_var.ptr()));
+        }
+        else if(strTypeName == "std::map") {
+
+        }
+        else {
+            dataCount_t ui16Count(_var.count());
+            int iDataSize(_var.typeIdsNames()[0]->size() * ui16Count);
+            _reserveBufferSize(sizeof(ui16Count) + iDataSize);
+
+            ::memcpy(&m_vecBuffer[m_iIndex], &ui16Count, sizeof(ui16Count));
+            m_iIndex += sizeof(ui16Count);
+
+            if (ui16Count > 0) {
+                ::memcpy(&m_vecBuffer[m_iIndex], _var.ptr(), iDataSize);
+                m_iIndex += iDataSize;
+            }
+        }
     }
 
 
@@ -686,13 +696,12 @@ private:
         return iIndex;
     }
 
-    template <typename... T>
-    bool _isNextData(bool _bWalking, T&&... args) {
-        std::vector<typeId_t> vec = { args... , 0 };
+    bool _isNextData(bool _bWalking, std::vector<typeId_t> _vec) {
+        _vec.push_back(0);
         int iIndex((_bWalking ? m_iIndex : _isNextData_seekSeq()));
 
-        for (int i(0); i < vec.size(); ++i) {
-            if (vec[i] != static_cast<typeId_t>(m_vecBuffer[iIndex]))
+        for (int i(0); i < _vec.size(); ++i) {
+            if (_vec[i] != static_cast<typeId_t>(m_vecBuffer[iIndex]))
                 return false;
             iIndex += sizeof(typeId_t);
         }
@@ -703,9 +712,8 @@ private:
         return true;
     }
 
-    template <typename... T>
-    inline void _chkExpectedType(T&&... args) {
-        if (!_isNextData(true, args...))
+    inline void _chkExpectedType(std::vector<typeId_t> _vec) {
+        if (!_isNextData(true, _vec))
             throw std::runtime_error("The next stored type does not match with the output requested type.");
     }
 
@@ -725,7 +733,8 @@ private:
     std::vector<uint8_t> m_vecBuffer;
     std::mutex           m_mtx;
 
-    static mapTypesInfos     s_mapTypes;
+    static mapTypesInfos_byName s_mapTypes_byName;
+    static mapTypesInfos_byId   s_mapTypes_byId;
 };
 
 
