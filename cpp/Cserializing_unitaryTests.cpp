@@ -14,7 +14,8 @@
 #define SK_COMPARE_INT(INTA, INTB) (INTA != INTB)
 #define SK_COMPARE_FLT(FLTA, FLTB) (::abs(FLTA - FLTB) >= std::numeric_limits<float>::epsilon())
 #define SK_COMPARE_CZ(CZA, CZB)    (::strcmp(CZA, CZB) != 0)
-#define SK_COMPARE_ARR(ARRA, ARRB, SIZE) (::memcmp(ARRA, ARRB, SIZE * sizeof(ARRB)) != 0)
+#define SK_COMPARE_ARR(ARRA, ARRB, SIZE) (::memcmp(ARRA, ARRB, SIZE) != 0)
+#define SK_COMPARE_ARRPTR(ARRA, ARRB, SIZE) (::memcmp(ARRA, ARRB, sizeof(ARRA) * SIZE) != 0)
 #define SK_COMPARE_VEC(VECA, VECB) ((VECA.size() != VECB.size()) || (std::equal(VECA.begin(), VECA.end(), VECB.begin()) != true))
 #define SK_COMPARE_MAP(MAPA, MAPB) ((MAPA.size() != MAPB.size()) || (std::equal(MAPA.begin(), MAPA.end(), MAPB.begin()) != true))
 #define SK_COMPARE_STR(STRA, STRB) (STRA != STRB)
@@ -121,9 +122,45 @@ void unitaryTests() {
         delete i64B;
     }
     
-    // T [N]
+    // T[N]
     {
+        Cserializing pe;
 
+        int8_t arrI32A[64] { 0 };
+        for (int i(0); i < 64; ++i)
+            arrI32A[i] = rand() % ((INT32_MAX - INT32_MIN + 1) + INT32_MIN);
+        pe.setNextData(arrI32A);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        int8_t arrI32B[64] { 0 };
+        if (!pe.nextDataType(arrI32B)) throw std::runtime_error("IsNextData T[N] failed.");
+        pe.getNextData(arrI32B);
+        if (SK_COMPARE_ARR(&arrI32A, &arrI32B, sizeof(arrI32A))) throw std::runtime_error("Get T[N] failed.");
+        arrI32B[63] *= 2;
+        if (!SK_COMPARE_ARR(&arrI32A, &arrI32B, sizeof(arrI32A))) throw std::runtime_error("Get T[N] failed.");
+    }
+
+    // T * []
+    {
+        Cserializing pe;
+
+        int64_t *arrI64A(new int64_t[64]);
+        for (int i(0); i < 64; ++i)
+            arrI64A[i] = rand() % ((INT64_MAX - INT64_MIN + 1) + INT64_MIN);
+        pe.setNextData(*arrI64A, 64);
+
+        pe.changeOperationType(Cserializing::Eoperation_Get);
+
+        int64_t *arrI64B(new int64_t[64]);
+        if (!pe.nextDataType(*arrI64B)) throw std::runtime_error("IsNextData T * [] failed.");
+        if (pe.nextDataSize() != 64) throw std::runtime_error("Size T * [] failed.");
+        pe.getNextData(*arrI64B, 64);
+        if (SK_COMPARE_ARRPTR(arrI64A, arrI64B, 64)) throw std::runtime_error("Get T * [] failed.");
+        arrI64B[63] *= 2;
+        if (!SK_COMPARE_ARRPTR(arrI64A, arrI64B, 64)) throw std::runtime_error("Get T * [] failed.");
+        delete arrI64A;
+        delete arrI64B;
     }
 
     // STD::VECTOR

@@ -76,7 +76,8 @@ public:
         void                   *ptrNode()      const { return m_ptrNode; }
         bool                    isInfoVec()    const { return m_bIsVarInfosVec; }
 
-        virtual void                                                       ptrVar(Cserializing *_ptrSerializer) const {}
+        virtual void                                                       set(Cserializing *_ptrSerializer) const {}
+        virtual void                                                       get(Cserializing *_ptrSerializer) const {}
 
     protected:
         vecTypesIdsNames   m_vecTypeIdsName;
@@ -95,9 +96,14 @@ public:
             }
         }
 
-        void ptrVar(Cserializing *_ptrSerializer) const {
+        void set(Cserializing *_ptrSerializer) const {
             //m_ptrVar->populate(_ptrSerializer);
             _ptrSerializer->_setNextData_template(*m_ptrVar);
+        }
+        
+        void get(Cserializing *_ptrSerializer) const {
+            //m_ptrVar->populate(_ptrSerializer);
+            _ptrSerializer->_getNextData_template(*m_ptrVar);
         }
 
     private:
@@ -231,42 +237,41 @@ public:
         return _isNextData(false, { sTypeInfos->typeId() });
     }
 
-    /*template <typename T, size_t N>
+    template <typename T, size_t N>
     bool _nextDataType(T(&_var)[N]) {
-        typeId_t ui8TypeId(0);
-        getTypeInfos_byType(_var[0], &ui8TypeId, nullptr, nullptr);
+        StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byType(_var[0], &sTypeInfos);
 
-        return _isNextData(false, ui8TypeId) && (static_cast<dataCount_t>(N) == static_cast<dataCount_t>(isNextCount()));
-    }*/
+        return _isNextData(false, { sTypeInfos->typeId() }) && (static_cast<dataCount_t>(N) == static_cast<dataCount_t>(_isNextCount(false)));
+    }
 
 
     int nextDataSize() {
         dataCount_t ui16Count(0);
-        ::memcpy(&ui16Count, &m_vecBuffer[m_iIndex], sizeof(ui16Count));
+        ::memcpy(&ui16Count, &m_arrUi8Buffer[m_iIndexCur], sizeof(ui16Count));
         return static_cast<int>(ui16Count);
     }
 
 
     template<typename T>
-    void setNextData(const T &_var, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
-        if (!_setNextData_structvar(_var))
-            _setNextData_template(_var);
+    void setNextData(const T &_var, int _iCount = 1, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
+        if (!_setNextData_structvar(_var)) {
+            if (_iCount == 1)
+                _setNextData_template(_var);
+            else
+                _setNextData_template(_var, _iCount);
+        }
     }
 
 
     template<typename T>
-    void getNextData(T &_var, typename std::enable_if<!std::is_pointer<T>::value>::type* = 0) {
-        constexpr bool has_varInfos = requires(T & _var) {
-            _var.__v;
-        };
-
-        if constexpr (has_varInfos) {
-            _getNextData_template(_var);
-
-
+    void getNextData(T &_var, int _iCount = 1, typename std::enable_if<!std::is_pointer<T>::value>::type* = 0) {
+        if (!_getNextData_structvar(_var)) {
+            if (_iCount == 1)
+                _getNextData_template(_var);
+            else
+                _getNextData_template(_var, _iCount);
         }
-        else
-            _getNextData_template(_var);
     }
 
 
@@ -274,7 +279,7 @@ public:
         if (m_eOperation == Eoperation_NULL)
             throw std::runtime_error("Eoperation_NULL operation type cannot be set.");
         m_eOperation = _eTypeOperation;
-        m_iIndex = 0;
+        m_iIndexCur = 0;
     }
 
 
@@ -407,7 +412,7 @@ private:
     }
 
 
-    template<typename T>
+    /*template<typename T>
     void _getNextData_unfold(T *_var) {
         constexpr bool has_varInfos = requires(T * _var) {
             _var->__v;
@@ -426,57 +431,56 @@ private:
         }
         else
             _getNextData_var(_var);
-    }
+    }*/
 
     void _getNextData_varInfo(const SvarInfo_base &_ptr) {
         _chkOperation(Eoperation_Get);
 
-        m_iIndex += sizeof(typeId_t);
+        m_iIndexCur += sizeof(typeId_t);
 
-        dataCount_t ui16Count(_isNextCount());
+        dataCount_t ui16Count(_isNextCount(false));
         uint32_t    ui32DataSize(_ptr.typeIdsNames()[0]->size() * ui16Count);
 
-        ::memcpy(_ptr.ptrNode(), &m_vecBuffer[m_iIndex], ui32DataSize);
+        ::memcpy(_ptr.ptrNode(), &m_arrUi8Buffer[m_iIndexCur], ui32DataSize);
         _incrementIndex(ui32DataSize);
     }
 
-    /*template <typename T, size_t N>
-    void _getNextData_template(const T(&_var)[N]) {
+    template <typename T, size_t N>
+    void _getNextData_template(T(&_var)[N]) {
         _chkOperation(Eoperation_Get);
 
-        dataCount_t ui16Count(_isNextCount());
-
-        typeId_t   ui8TypeId(0);
-        typeSize_t ui32TypeSize(0);
-        getTypeInfos_byType(T(), &ui8TypeId, &ui32TypeSize, nullptr);
-        _chkExpectedType(ui8TypeId);
-
-        uint32_t ui32DataSize(ui32TypeSize * ui16Count);
-
-        ::memcpy(_var, &m_vecBuffer[m_iIndex], ui32DataSize);
-        _incrementIndex(ui32DataSize);
-    }*/
-
-    template<typename T>
-    void _getNextData_template(T &_var) {
-        _chkOperation(Eoperation_Get);
-
-        dataCount_t ui16Count(_isNextCount());
+        dataCount_t ui16Count(_isNextCount(false));
 
         StypeInfos *sTypeInfos(nullptr);
         getTypeInfos_byType(T(), &sTypeInfos);
-        _chkExpectedType({ sTypeInfos->typeId() });
+        _chkExpectedType({ sTypeInfos->typeId() }, N);
 
         uint32_t ui32DataSize(sTypeInfos->size() * ui16Count);
 
-        ::memcpy((void *)&_var, &m_vecBuffer[m_iIndex], ui32DataSize);
+        ::memcpy(_var, &m_arrUi8Buffer[m_iIndexCur], ui32DataSize);
+        _incrementIndex(ui32DataSize);
+    }
+
+    template<typename T>
+    void _getNextData_template(T &_var, int _iCount = 1) {
+        _chkOperation(Eoperation_Get);
+
+        dataCount_t ui16Count(_isNextCount(false));
+
+        StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byType(T(), &sTypeInfos);
+        _chkExpectedType({ sTypeInfos->typeId() }, _iCount);
+
+        uint32_t ui32DataSize(sTypeInfos->size() * ui16Count);
+
+        ::memcpy((void *)&_var, &m_arrUi8Buffer[m_iIndexCur], ui32DataSize);
         _incrementIndex(ui32DataSize);
     }
     
     void _getNextData_template(std::string &_var) {
         _chkOperation(Eoperation_Get);
 
-        dataCount_t ui16Count(_isNextCount());
+        dataCount_t ui16Count(_isNextCount(false));
 
         StypeInfos *sTypeInfos(nullptr);
         getTypeInfos_byName("std::string", &sTypeInfos);
@@ -484,7 +488,7 @@ private:
 
         uint32_t ui32DataSize(sTypeInfos->size() * ui16Count);
 
-        _var = std::string(reinterpret_cast<char*>(&m_vecBuffer[m_iIndex]), ui32DataSize);
+        _var = std::string(reinterpret_cast<char*>(&m_arrUi8Buffer[m_iIndexCur]), ui32DataSize);
 
         _incrementIndex(ui32DataSize);
     }
@@ -493,7 +497,7 @@ private:
     void _getNextData_template(std::vector<U> &_vec) {
         _chkOperation(Eoperation_Get);
 
-        dataCount_t ui16Count(_isNextCount());
+        dataCount_t ui16Count(_isNextCount(false));
 
         StypeInfos *sTypeInfos_vec(nullptr);
         StypeInfos *sTypeInfos_var(nullptr);
@@ -504,7 +508,7 @@ private:
         uint32_t ui32DataSize(sTypeInfos_var->size() * static_cast<uint32_t>(ui16Count));
         _vec.resize(ui16Count);
 
-        ::memcpy(&_vec[0], &m_vecBuffer[m_iIndex], ui32DataSize);
+        ::memcpy(&_vec[0], &m_arrUi8Buffer[m_iIndexCur], ui32DataSize);
         _incrementIndex(ui32DataSize);
     }
 
@@ -512,7 +516,7 @@ private:
     void _getNextData_template(std::map<U, V> &_map) {
         _chkOperation(Eoperation_Get);
 
-        dataCount_t ui16Count(_isNextCount());
+        dataCount_t ui16Count(_isNextCount(false));
 
         StypeInfos *sTypeInfos_map(nullptr),
                    *sTypeInfos_var1(nullptr),
@@ -527,15 +531,51 @@ private:
 
         for (uint16_t i(0); i < ui16Count; ++i) {
             U key;
-            ::memcpy(&key, &m_vecBuffer[m_iIndex], ui32SizeType1);
+            ::memcpy(&key, &m_arrUi8Buffer[m_iIndexCur], ui32SizeType1);
             _incrementIndex(ui32SizeType1);
 
             V val;
-            ::memcpy(&val, &m_vecBuffer[m_iIndex], ui32SizeType2);
+            ::memcpy(&val, &m_arrUi8Buffer[m_iIndexCur], ui32SizeType2);
             _incrementIndex(ui32SizeType2);
 
             _map.insert({ key, val });
         }
+    }
+
+    template<typename T>
+    bool _getNextData_structvar(const T &_var) {
+        constexpr bool has_varInfos = requires(T & _var) {
+            _var.__v;
+        };
+
+        if constexpr (has_varInfos) {
+            _chkOperation(Eoperation_Get);
+
+            dataCount_t ui16Count(_isNextCount(false));
+
+            StypeInfos *sTypeInfos_UserStruct(nullptr);
+            getTypeInfos_byType(_var, &sTypeInfos_UserStruct);
+            _chkExpectedType({ sTypeInfos_UserStruct->typeId() }, static_cast<int>(ui16Count));
+
+            for (int i(0); i < _var.__v.size(); ++i)
+                _getNextData_structvar_run(*_var.__v[i].get());
+        }
+        else
+            return false;
+
+        return true;
+    }
+
+    void _getNextData_structvar_run(const SvarInfo_base &_var) {
+        if (_var.isInfoVec()) {
+            //std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> &vec = (*reinterpret_cast<std::vector<std::unique_ptr<Cserializing::SvarInfo_base>>>(_var.ptrNode()));
+            std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> *vec = reinterpret_cast<std::vector<std::unique_ptr<Cserializing::SvarInfo_base>>*>(_var.ptrNode());
+
+            for (int i(0); i < vec->size(); ++i)
+                _getNextData_structvar_run(*vec->at(i).get());
+        }
+        else
+            _var.get(this);
     }
 
 
@@ -551,7 +591,7 @@ private:
         uint32_t ui32DataSize(sTypeInfos->size() * _iCount);
         _reserveBufferSize(ui32DataSize);
 
-        ::memcpy(&m_vecBuffer[m_iIndex], &_var, ui32DataSize);
+        ::memcpy(&m_arrUi8Buffer[m_iIndexCur], &_var, ui32DataSize);
         _incrementIndex(ui32DataSize);
     }
 
@@ -562,13 +602,12 @@ private:
         StypeInfos *sTypeInfos(nullptr);
         getTypeInfos_byType(_var[0], &sTypeInfos);
 
-        int iCount(N);
-        _setHeader(iCount, { sTypeInfos->typeId()});
+        _setHeader(N, { sTypeInfos->typeId()});
 
-        uint32_t ui32DataSize(sTypeInfos->size() * iCount);
+        uint32_t ui32DataSize(sTypeInfos->size() * N);
         _reserveBufferSize(ui32DataSize);
 
-        ::memcpy(&m_vecBuffer[m_iIndex], _var, ui32DataSize);
+        ::memcpy(&m_arrUi8Buffer[m_iIndexCur], _var, ui32DataSize);
         _incrementIndex(ui32DataSize);
     }
 
@@ -587,7 +626,7 @@ private:
         uint32_t ui32DataSize(sTypeInfos_var->size() * iCount);
         _reserveBufferSize(ui32DataSize);
 
-        ::memcpy(&m_vecBuffer[m_iIndex], &_vec[0], ui32DataSize);
+        ::memcpy(&m_arrUi8Buffer[m_iIndexCur], &_vec[0], ui32DataSize);
         _incrementIndex(ui32DataSize);
     }
 
@@ -612,9 +651,9 @@ private:
         _reserveBufferSize((ui32SizeType1 + ui32SizeType2) * iCount);
 
         for (const auto &[key, val] : *_map) {
-            ::memcpy(&m_vecBuffer[m_iIndex], &key, ui32SizeType1);
+            ::memcpy(&m_arrUi8Buffer[m_iIndex], &key, ui32SizeType1);
             _incrementIndex(ui32SizeType1);
-            ::memcpy(&m_vecBuffer[m_iIndex], &val, ui32SizeType2);
+            ::memcpy(&m_arrUi8Buffer[m_iIndex], &val, ui32SizeType2);
             _incrementIndex(ui32SizeType2);
         }
     }*/
@@ -633,9 +672,10 @@ private:
 
         _reserveBufferSize(ui32TypeSize);
 
-        ::memcpy(&m_vecBuffer[m_iIndex], &str[0], ui32TypeSize);
+        ::memcpy(&m_arrUi8Buffer[m_iIndexCur], &str[0], ui32TypeSize);
         _incrementIndex(ui32TypeSize);
     }
+
 
     template<typename T>
     bool _setNextData_structvar(const T &_var) {
@@ -668,44 +708,44 @@ private:
                 _setNextData_structvar_run(*vec->at(i).get());
         }
         else
-            _setNextData_structvar_var(_var);
+            _var.set(this);
     }
 
-    void _setNextData_structvar_var(const SvarInfo_base &_var) {
-        const std::string strTypeName(_var.typeIdsNames()[0]->typeName());
+    //void _setNextData_structvar_var(const SvarInfo_base &_var) {
+    //    const std::string strTypeName(_var.typeIdsNames()[0]->typeName());
 
-        if (strTypeName == "std::string") {
-            //const std::string &str(reinterpret_cast<std::string &>(*reinterpret_cast<std::string *>(_var.ptr())));
-            //_setNextData_template(str);
-            _var.ptrVar(this);
-        }
-        else if (strTypeName == "std::vector") {
-            //_var.populate(this);
-            _var.ptrVar(this);
+    //    if (strTypeName == "std::string") {
+    //        //const std::string &str(reinterpret_cast<std::string &>(*reinterpret_cast<std::string *>(_var.ptr())));
+    //        //_setNextData_template(str);
+    //        _var.set(this);
+    //    }
+    //    else if (strTypeName == "std::vector") {
+    //        //_var.populate(this);
+    //        _var.set(this);
 
-            //using t = decltype(_var.typeIdsNames()[1]->type());
+    //        //using t = decltype(_var.typeIdsNames()[1]->type());
 
-            //std::vector<t> *vec(reinterpret_cast<std::vector<t>*>(_var.ptr()));
-            //_setNextData_template(*vec);
-        }
-        else if(strTypeName == "std::map") {
-            _var.ptrVar(this);
-        }
-        else {
-            _var.ptrVar(this);
-            /*dataCount_t ui16Count(_var.count());
-            int iDataSize(_var.typeIdsNames()[0]->size() * ui16Count);
-            _reserveBufferSize(sizeof(ui16Count) + iDataSize);
+    //        //std::vector<t> *vec(reinterpret_cast<std::vector<t>*>(_var.ptr()));
+    //        //_setNextData_template(*vec);
+    //    }
+    //    else if(strTypeName == "std::map") {
+    //        _var.set(this);
+    //    }
+    //    else {
+    //        _var.set(this);
+    //        /*dataCount_t ui16Count(_var.count());
+    //        int iDataSize(_var.typeIdsNames()[0]->size() * ui16Count);
+    //        _reserveBufferSize(sizeof(ui16Count) + iDataSize);
 
-            ::memcpy(&m_vecBuffer[m_iIndex], &ui16Count, sizeof(ui16Count));
-            m_iIndex += sizeof(ui16Count);
+    //        ::memcpy(&m_arrUi8Buffer[m_iIndex], &ui16Count, sizeof(ui16Count));
+    //        m_iIndex += sizeof(ui16Count);
 
-            if (ui16Count > 0) {
-                ::memcpy(&m_vecBuffer[m_iIndex], _var.ptr(), iDataSize);
-                m_iIndex += iDataSize;
-            }*/
-        }
-    }
+    //        if (ui16Count > 0) {
+    //            ::memcpy(&m_arrUi8Buffer[m_iIndex], _var.ptr(), iDataSize);
+    //            m_iIndex += iDataSize;
+    //        }*/
+    //    }
+    //}
 
 
     void _chkOperation(const Eoperation_ &_eTypeOperation) {
@@ -713,7 +753,7 @@ private:
             return;
         else if (m_eOperation == Eoperation_NULL) {
             m_eOperation = _eTypeOperation;
-            m_iIndex = 0;
+            m_iIndexCur = 0;
         }
         else
             throw std::runtime_error("The current operation type does not match the function type.");
@@ -729,51 +769,55 @@ private:
         for (int i(0); i < iValueMaxNbr + 2; ++i) {
             switch (iValueMaxNbr - i) {
             case 0:
-                ::memcpy(&m_vecBuffer[m_iIndex], reinterpret_cast<const dataCount_t *>(&_iLength), sizeof(dataCount_t));
+                ::memcpy(&m_arrUi8Buffer[m_iIndexCur], reinterpret_cast<const dataCount_t *>(&_iLength), sizeof(dataCount_t));
                 break;
 
             case -1:
                 {
                     dataCount_t ui16CountValNull(0);
-                    ::memcpy(&m_vecBuffer[m_iIndex], &ui16CountValNull, sizeof(dataCount_t));
+                    ::memcpy(&m_arrUi8Buffer[m_iIndexCur], &ui16CountValNull, sizeof(dataCount_t));
                 }
                 break;
 
             default:
                 {
                     dataCount_t ui16CountValMax(std::numeric_limits<dataCount_t>::max());
-                    ::memcpy(&m_vecBuffer[m_iIndex], &ui16CountValMax, sizeof(dataCount_t));
+                    ::memcpy(&m_arrUi8Buffer[m_iIndexCur], &ui16CountValMax, sizeof(dataCount_t));
                 }
                 break;
             }
 
-            m_iIndex += sizeof(dataCount_t);
+            m_iIndexCur += sizeof(dataCount_t);
         }
 
         for (int i(0); i < _vecTypeIds.size(); ++i) {
-            ::memcpy(&m_vecBuffer[m_iIndex], &_vecTypeIds[i], sizeof(typeId_t));
-            m_iIndex += sizeof(typeId_t);
+            ::memcpy(&m_arrUi8Buffer[m_iIndexCur], &_vecTypeIds[i], sizeof(typeId_t));
+            m_iIndexCur += sizeof(typeId_t);
         }
     }
 
-    int _isNextCount() {
+    int _isNextCount(bool _bWalking) {
         int         iDataCount(0);
+        int         iIndex(m_iIndexCur);
         dataCount_t ui16DataCount(0);
 
         do {
-            ::memcpy(&ui16DataCount, &m_vecBuffer[m_iIndex], sizeof(dataCount_t));
-            m_iIndex += sizeof(dataCount_t);
+            ::memcpy(&ui16DataCount, &m_arrUi8Buffer[iIndex], sizeof(dataCount_t));
+            iIndex += sizeof(dataCount_t);
             iDataCount += static_cast<int>(ui16DataCount);
         } while (ui16DataCount != 0);
+
+        if (_bWalking)
+            m_iIndexCur = iIndex;
 
         return iDataCount;
     }
 
     int _isNextData_seekSeq() {
-        int iIndex(m_iIndex);
+        int iIndex(m_iIndexCur);
         dataCount_t ui16DataCount(0);
         do {
-            ::memcpy(&ui16DataCount, &m_vecBuffer[iIndex], sizeof(dataCount_t));
+            ::memcpy(&ui16DataCount, &m_arrUi8Buffer[iIndex], sizeof(dataCount_t));
             iIndex += sizeof(dataCount_t);
         } while (ui16DataCount != 0);
 
@@ -782,40 +826,52 @@ private:
 
     bool _isNextData(bool _bWalking, std::vector<typeId_t> _vec) {
         _vec.push_back(0);
-        int iIndex((_bWalking ? m_iIndex : _isNextData_seekSeq()));
+        int iIndex((_bWalking ? m_iIndexCur : _isNextData_seekSeq()));
 
         for (int i(0); i < _vec.size(); ++i) {
-            if (_vec[i] != static_cast<typeId_t>(m_vecBuffer[iIndex]))
+            if (_vec[i] != static_cast<typeId_t>(m_arrUi8Buffer[iIndex]))
                 return false;
             iIndex += sizeof(typeId_t);
         }
 
         if (_bWalking)
-            m_iIndex = iIndex;
+            m_iIndexCur = iIndex;
 
         return true;
     }
 
-    inline void _chkExpectedType(std::vector<typeId_t> _vec) {
-        if (!_isNextData(true, _vec))
+    inline void _chkExpectedType(std::vector<typeId_t> _vec, int _iCount = -1) {
+        if (((_isNextCount(true) != _iCount) && (_iCount > 0)) || !_isNextData(true, _vec))
             throw std::runtime_error("The next stored type does not match with the output requested type.");
     }
 
     inline void _reserveBufferSize(const int &_iSize) {
-        m_vecBuffer.resize(m_vecBuffer.size() + _iSize);
+        if (static_cast<int>(m_iIndexMax) < m_iIndexCur + _iSize) {
+            uint32_t ui32Size(m_iIndexMax + _iSize);
+
+            uint8_t *arrUi8BufferNew = new uint8_t[ui32Size];
+            ::memset(arrUi8BufferNew, 0, ui32Size);
+            ::memcpy(arrUi8BufferNew, m_arrUi8Buffer, m_iIndexMax);
+
+            delete[] m_arrUi8Buffer;
+
+            m_iIndexMax = ui32Size;
+            m_arrUi8Buffer = arrUi8BufferNew;
+        }
     }
 
 
     inline void _incrementIndex(const int &_iTypeSize) {
-        m_iIndex += _iTypeSize;
+        m_iIndexCur += _iTypeSize;
     }
 
 
 
-    int                  m_iIndex = 0;
-    Eoperation_          m_eOperation = Eoperation_NULL;
-    std::vector<uint8_t> m_vecBuffer;
-    std::mutex           m_mtx;
+    int          m_iIndexCur    = 0;
+    int          m_iIndexMax    = 0;
+    Eoperation_  m_eOperation   = Eoperation_NULL;
+    uint8_t     *m_arrUi8Buffer = nullptr;
+    std::mutex   m_mtx;
 
     static mapTypesInfos_byName s_mapTypes_byName;
     static mapTypesInfos_byId   s_mapTypes_byId;
