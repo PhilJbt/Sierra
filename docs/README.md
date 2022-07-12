@@ -93,13 +93,17 @@ CPU Caches:
   L1 Instruction 32 KiB (x8)
   L2 Unified 256 KiB (x8)
   L3 Unified 12288 KiB (x1)
-----------------------------------------------------------------------------------------
-Benchmark                                              Time             CPU   Iterations
-----------------------------------------------------------------------------------------
-Store 3 vars (500 bytes each)                       5334 ns         5312 ns       100000
-Retrieve 3 vars (500 bytes each)                     495 ns          488 ns      1120000
-Serialize 3 stored vars to an array (500 bytes)      337 ns          337 ns      2133333
-Unserialize 1500 bytes array                        5169 ns         5156 ns       100000
 ```
+| Description | From | To | Size | Time | CPU | Iterations | Link |
+| ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
+| Pack structs | 3 aggregate structs | Serializer package | 3 x 500 bytes | 5316 ns | 5441 ns | 112000 | [See the code](Cserializing_benchmark.hpp#L48-L65) |
+| Serialize structs | Serializer package | Bytes array | 3 x 500 bytes | 341 ns | 338 ns | 2036364 | [See the code](Cserializing_benchmark.hpp#L91-L117) |
+| Unserialize structs | Bytes array | Serializer package | 3 x 500 bytes | 5159 ns | 5156 ns | 100000 | [See the code](Cserializing_benchmark.hpp#L119-L148) |
+| Unpack structs | Serializer package | 3 aggregate structs | 3 x 500 bytes | 493 ns | 488 ns | 1120000 | [See the code](Cserializing_benchmark.hpp#L67-L90) |
+| Pack variable | uin64_t Array | Serializer package | 1500 bytes | 693 ns | 670 ns | 1120000 | [See the code](Cserializing_benchmark.hpp#L151-L165) |
+| Serialize variable | Serializer package | Bytes array | 1500 bytes | 74.8 ns | 75.0 ns | 8960000 | [See the code](Cserializing_benchmark.hpp#L189-L212) |
+| Unserialize variable | Bytes array | Serializer package | 1500 bytes | 694 ns | 698 ns | 1120000 | [See the code](Cserializing_benchmark.hpp#L214-L240) |
+| Unpack variable | Serializer package | uin64_t Array | 1500 bytes | 53.9 ns | 54.7 ns | 10000000 | [See the code](Cserializing_benchmark.hpp#L167-L188) |
+
 
 ###### [Return to index](#index)
