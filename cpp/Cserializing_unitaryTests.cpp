@@ -90,6 +90,34 @@ void unitaryTests() {
     //std::unordered_multiset
     //std::unordered_multimap
 
+    // STORED DATA -> STACK ARRAY
+    {
+        uint8_t *ui8Buff(nullptr);
+        int      iLength(0);
+        {
+            Cserializing pe;
+
+            uint64_t ui64A(UINT64_MAX);
+            int8_t   i8A(INT8_MAX);
+            pe.setNextData(ui64A);
+            pe.setNextData(i8A);
+
+            pe.serialize(&ui8Buff, iLength, true);
+        }
+
+    // STACK ARRAY -> STORED DATA
+        {
+            Cserializing pe;
+
+            pe.unserialize(&ui8Buff, iLength);
+
+            uint64_t ui64B(0);
+            int8_t   i8B(0);
+            pe.getNextData(ui64B);
+            pe.getNextData(i8B);
+        }
+    }
+
     // T
     {
         Cserializing pe;
@@ -97,8 +125,8 @@ void unitaryTests() {
         int64_t i64A(INT64_MIN);
         pe.setNextData(i64A);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
-
+        pe.changeTypeTo_Get();
+        
         int64_t i64B(0);
         if (!pe.nextDataType(i64B)) throw std::runtime_error("IsNextData T failed.");
         pe.getNextData(i64B);
@@ -112,7 +140,7 @@ void unitaryTests() {
         int64_t *i64A(new int64_t(INT64_MIN));
         pe.setNextData(*i64A);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
+        pe.changeTypeTo_Get();
 
         int64_t *i64B(new int64_t(0));
         if (!pe.nextDataType(*i64B)) throw std::runtime_error("IsNextData T * failed.");
@@ -131,7 +159,7 @@ void unitaryTests() {
             arrI32A[i] = rand() % ((INT32_MAX - INT32_MIN + 1) + INT32_MIN);
         pe.setNextData(arrI32A);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
+        pe.changeTypeTo_Get();
 
         int8_t arrI32B[64] { 0 };
         if (!pe.nextDataType(arrI32B)) throw std::runtime_error("IsNextData T[N] failed.");
@@ -150,11 +178,11 @@ void unitaryTests() {
             arrI64A[i] = rand() % ((INT64_MAX - INT64_MIN + 1) + INT64_MIN);
         pe.setNextData(*arrI64A, 64);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
+        pe.changeTypeTo_Get();
 
         int64_t *arrI64B(new int64_t[64]);
         if (!pe.nextDataType(*arrI64B)) throw std::runtime_error("IsNextData T * [] failed.");
-        if (pe.nextDataSize() != 64) throw std::runtime_error("Size T * [] failed.");
+        if (pe.nextDataCount() != 64) throw std::runtime_error("Size T * [] failed.");
         pe.getNextData(*arrI64B, 64);
         if (SK_COMPARE_ARRPTR(arrI64A, arrI64B, 64)) throw std::runtime_error("Get T * [] failed.");
         arrI64B[63] *= 2;
@@ -170,7 +198,7 @@ void unitaryTests() {
         std::vector<uint8_t> vecA { 11, 33, 22 };
         pe.setNextData(vecA);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
+        pe.changeTypeTo_Get();
 
         std::vector<uint8_t> vecB;
         if (!pe.nextDataType(vecB)) throw std::runtime_error("IsNextData STD::VECTOR failed.");
@@ -185,7 +213,7 @@ void unitaryTests() {
         std::vector<uint8_t> *vecA(new std::vector<uint8_t>({ 11, 33, 22 }));
         pe.setNextData(*vecA);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
+        pe.changeTypeTo_Get();
 
         std::vector<uint8_t> *vecB(new std::vector<uint8_t>());
         if (!pe.nextDataType(*vecB)) throw std::runtime_error("IsNextData STD::VECTOR * failed.");
@@ -207,7 +235,7 @@ void unitaryTests() {
         float fA(5.7f);
         pe.setNextData(fA);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
+        pe.changeTypeTo_Get();
 
         double dB(.0);
         if (pe.nextDataType(dB)) throw std::runtime_error("IsNextData FLT/DBL failed.");
@@ -224,7 +252,7 @@ void unitaryTests() {
         float *fA(new float(5.7f));
         pe.setNextData(*fA);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
+        pe.changeTypeTo_Get();
 
         double *dB(new double(.0));
         if (pe.nextDataType(*dB)) throw std::runtime_error("IsNextData FLT/DBL * failed.");
@@ -250,7 +278,7 @@ void unitaryTests() {
         *strA = "oYfgi2libM";
         pe.setNextData(*strA);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
+        pe.changeTypeTo_Get();
 
         std::string *strB(new std::string);
         if (!pe.nextDataType(*strB)) throw std::runtime_error("IsNextData STD::STRING * failed.");
@@ -304,7 +332,7 @@ void unitaryTests() {
         sA.s1.s2.vec = { 22, 11, 33 };
         pe.setNextData(sA);
 
-        pe.changeOperationType(Cserializing::Eoperation_Get);
+        pe.changeTypeTo_Get();
 
         Stest sB(0, .0f, "\0\0\0\0");
         sB.s1.str = "";
