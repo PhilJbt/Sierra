@@ -84,8 +84,8 @@ pe.getNextData(mapB);
 # BENCHMARK
 
 ```
-2022-xx-xxTxx:xx:xx+02:00
-Running xxxxxxxx.exe
+2022-07-13T01:04:54+02:00
+Running Sierra.exe
 DoNotOptimize enabled
 Run on (8 X 3655.17 MHz CPU s)
 CPU Caches:
@@ -93,10 +93,13 @@ CPU Caches:
   L1 Instruction 32 KiB (x8)
   L2 Unified 256 KiB (x8)
   L3 Unified 12288 KiB (x1)
------------------------------------------------------------------------------
-Benchmark                                   Time             CPU   Iterations
------------------------------------------------------------------------------
-xxxxxxxxxxx                                 xxxxxxxx         xxxxx      xxxxx
+----------------------------------------------------------------------------------------
+Benchmark                                              Time             CPU   Iterations
+----------------------------------------------------------------------------------------
+Store 3 vars (500 bytes each)                       5334 ns         5312 ns       100000
+Retrieve 3 vars (500 bytes each)                     495 ns          488 ns      1120000
+Serialize 3 stored vars to an array (500 bytes)      337 ns          337 ns      2133333
+Unserialize 1500 bytes array                        5169 ns         5156 ns       100000
 ```
 
 ###### [Return to index](#index)
