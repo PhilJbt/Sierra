@@ -483,7 +483,9 @@ public:
     template<typename T>
     static void getTypeInfos_byType(const T &_t, StypeInfos **_out_sTypeInfos) {
         std::string strTypeName(std::type_index(typeid(const_cast<T &>(_t))).name());
-        if (!isTypeRegistered_byName(strTypeName))
+        if (strTypeName.find("std::vector") != std::string::npos)
+            return getTypeInfos_byName("std::vector", _out_sTypeInfos);
+        else if (!isTypeRegistered_byName(strTypeName))
             throw std::runtime_error("Type not registered");
         const mapTypesInfos_byName::iterator &&itElem(s_mapTypes_byName.find(strTypeName));
         
@@ -865,16 +867,20 @@ private:
             m_ptrSeqCur = m_ptrSeqCur->nextNode();
     }
 
-
+    int iTypeIDCur = 0;
+    typeId_t typppes[4] = { 0 };
     template <typename T>
-    void _setNextData_template(const T &_var, const int &_iCount = 1) {
-        StypeInfos *sTypeInfos(nullptr);
+    void _setNextData_template(SnextSequence *sSeq, const T &_var, const int &_iCount = 1) {
+        StypeInfos *sTypeInfos_var(nullptr);
+        getTypeInfos_byType(_var, &sTypeInfos_var);
+        typppes[iTypeIDCur++] = *sTypeInfos_var->typeId();
+        /*StypeInfos *sTypeInfos(nullptr);
         getTypeInfos_byType(T(), &sTypeInfos);
         uint32_t ui32DataSize(sTypeInfos->size() * _iCount);
 
         SnextSequence *sSeq(new SnextSequence(&_var, ui32DataSize, _iCount));
         sSeq->typeSet(0, sTypeInfos->typeId());
-        _updateSeqPtr_Set(sSeq);
+        _updateSeqPtr_Set(sSeq);*/
     }
 
     template <typename T, size_t N>
@@ -890,7 +896,11 @@ private:
 
     template<typename U>
     void _setNextData_template(const std::vector<U> &_vec) {
-        StypeInfos *sTypeInfos_vec(nullptr),
+        StypeInfos *sTypeInfos_vec(nullptr);
+        getTypeInfos_byType(_vec, &sTypeInfos_vec);
+        typppes[iTypeIDCur++] = *sTypeInfos_vec->typeId();
+        _setNextData_template(_vec[0]);
+        /*StypeInfos *sTypeInfos_vec(nullptr),
                    *sTypeInfos_var(nullptr);
         getTypeInfos_byName("std::vector", &sTypeInfos_vec);
         getTypeInfos_byType(_vec[0],       &sTypeInfos_var);
@@ -901,7 +911,7 @@ private:
         SnextSequence *sSeq(new SnextSequence(&_vec[0], ui32DataSize, iCount));
         sSeq->typeSet(0, sTypeInfos_vec->typeId());
         sSeq->typeSet(1, sTypeInfos_var->typeId());
-        _updateSeqPtr_Set(sSeq);
+        _updateSeqPtr_Set(sSeq);*/
     }
 
     /*template<typename U, typename V>

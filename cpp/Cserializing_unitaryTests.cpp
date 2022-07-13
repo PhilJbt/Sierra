@@ -89,7 +89,7 @@ void unitaryTests() {
     //std::unordered_map
     //std::unordered_multiset
     //std::unordered_multimap
-
+    /*
     // STORED DATA -> STACK ARRAY
     {
         uint8_t *ui8Buff(nullptr);
@@ -221,11 +221,21 @@ void unitaryTests() {
         if (SK_COMPARE_VEC((*vecA), (*vecB))) throw std::runtime_error("Get STD::VECTOR * failed.");
         delete vecA;
         delete vecB;
-    }
+    }*/
 
     // STD::VECTOR [N]
     {
+        Cserializing pe;
 
+        std::vector<std::vector<uint16_t>> vecA = { {1, 2, 3}, { 6, 5 } };
+        pe.setNextData(vecA);
+
+        pe.changeTypeTo_Get();
+
+        std::vector<std::vector<uint16_t>> vecB;
+        if (!pe.nextDataType(vecB)) throw std::runtime_error("IsNextData STD::VECTOR [] failed.");
+        pe.getNextData(vecB);
+        if (SK_COMPARE_VEC(vecA[0], vecB[0]) || SK_COMPARE_VEC(vecA[1], vecB[1]) || SK_COMPARE_VEC(vecA[2], vecB[2])) throw std::runtime_error("Get STD::VECTOR [] failed.");
     }
 
     // SAME TYPE
