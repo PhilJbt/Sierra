@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <numeric>
 #include <concepts>
+#include <tuple>
 
 
 typedef uint8_t  typeId_t;
@@ -38,12 +39,15 @@ typedef std::vector<StypeInfos *>                     vecTypesIdsNames;
 
 #define SK_TYPES_NBR_MAX 10
 
+
 /*
 ** 
 *
 */
 class Cserializing {
 public:
+    struct SnextSequence;
+
     struct SvarInfo_var_base {
     public:
         virtual ~SvarInfo_var_base() {}
@@ -60,7 +64,7 @@ public:
         }
 
         void populate(Cserializing *_ptrSerializer) {
-            _ptrSerializer->_setNextData_template(m_val);
+            _ptrSerializer->_setNextData_write(this, m_val);
         }
 
         T *val() { return m_val; }
@@ -77,8 +81,8 @@ public:
         void                   *ptrNode()      const { return m_ptrNode; }
         bool                    isInfoVec()    const { return m_bIsVarInfosVec; }
 
-        virtual void                                                       set(Cserializing *_ptrSerializer) const {}
-        virtual void                                                       get(Cserializing *_ptrSerializer) const {}
+        virtual void                                                       set(SnextSequence *_sSeq, Cserializing *_ptrSerializer) const {}
+        virtual void                                                       get(SnextSequence *_sSeq, Cserializing *_ptrSerializer) const {}
 
     protected:
         vecTypesIdsNames   m_vecTypeIdsName;
@@ -97,14 +101,14 @@ public:
             }
         }
 
-        void set(Cserializing *_ptrSerializer) const {
+        void set(SnextSequence *_sSeq, int &_iReadOffset, Cserializing *_ptrSerializer) const {
             //m_ptrVar->populate(_ptrSerializer);
-            _ptrSerializer->_setNextData_template(*m_ptrVar);
+            _ptrSerializer->_getNextData_retrieve(_sSeq, _iReadOffset , * m_ptrVar);
         }
-        
-        void get(Cserializing *_ptrSerializer) const {
+
+        void get(SnextSequence *_sSeq, int &_iReadOffset, Cserializing *_ptrSerializer) const {
             //m_ptrVar->populate(_ptrSerializer);
-            _ptrSerializer->_getNextData_template(*m_ptrVar);
+            _ptrSerializer->_getNextData_retrieve(_sSeq, _iReadOffset , *m_ptrVar);
         }
 
     private:
@@ -198,6 +202,49 @@ public:
         ~SnextSequence() {
             if (m_ui8ArrBuffer)
                 delete[] m_ui8ArrBuffer;
+        }
+
+        typeId_t getChunkId(int &_iOffset) {
+            typeId_t ui8ChunkId(0);
+            ::memcpy(&ui8ChunkId, &m_ui8ArrBuffer[_iOffset], sizeof(typeId_t));
+            _iOffset += sizeof(typeId_t);
+            return ui8ChunkId;
+        }
+
+        void setChunkId(typeId_t _ui8ChunkId, int &_iOffset) {
+            ::memcpy(&m_ui8ArrBuffer[_iOffset], &_ui8ChunkId, sizeof(typeId_t));
+            _iOffset += sizeof(typeId_t);
+        }
+
+        void setChunkSize(uint32_t _ui32Weight, int &_iOffset) {
+            m_ui8ArrBuffer = new uint8_t[_ui32Weight];
+            ::memset(m_ui8ArrBuffer, 0, _ui32Weight);
+            m_ui32DataSize = _ui32Weight;
+        }
+
+        dataCount_t readCount(int &_iOffset) {
+            dataCount_t ui16Count(0);
+            ::memcpy(&ui16Count, &m_ui8ArrBuffer[_iOffset], sizeof(dataCount_t));
+            _iOffset += sizeof(dataCount_t);
+            return ui16Count;
+        }
+
+        void writeCount(dataCount_t _ui16Count, int &_iOffset) {
+            ::memcpy(&m_ui8ArrBuffer[_iOffset], &_ui16Count, sizeof(dataCount_t));
+            _iOffset += sizeof(dataCount_t);
+        }
+
+        template <typename T>
+        void readData(T &_var, int &_iOffset) {
+            ::memcpy(&_var, &m_ui8ArrBuffer[_iOffset], sizeof(_var));
+            _iOffset += sizeof(_var);
+        }
+
+        template <typename T>
+        void writeData(T &_var, int &_iOffset) {
+            uint32_t ui32DataSize(sizeof(_var));
+            ::memcpy(&m_ui8ArrBuffer[_iOffset], &_var, ui32DataSize);
+            _iOffset += sizeof(_var);
         }
 
         void nextNode(SnextSequence *_ptrNext) {
@@ -384,43 +431,38 @@ public:
     }
 
 
-    template<typename T>
-    bool nextDataType(const T &_var, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
-        return _nextDataType(_var);
-    }
+    //bool _nextDataType(const std::string &_str) {
+    //    StypeInfos *sTypeInfos(nullptr);
+    //    getTypeInfos_byName("std::string", &sTypeInfos);
 
-    bool _nextDataType(const std::string &_str) {
-        StypeInfos *sTypeInfos(nullptr);
-        getTypeInfos_byName("std::string", &sTypeInfos);
+    //    return m_ptrSeqCur->type(0, sTypeInfos->typeId());
+    //}
 
-        return m_ptrSeqCur->type(0, sTypeInfos->typeId());
-    }
+    //template<typename U>
+    //bool _nextDataType(const std::vector<U> &_vec) {
+    //    StypeInfos *sTypeInfos_vec(nullptr);
+    //    StypeInfos *sTypeInfos_var(nullptr);
+    //    getTypeInfos_byName("std::vector", &sTypeInfos_vec);
+    //    getTypeInfos_byType(U(), &sTypeInfos_var);
 
-    template<typename U>
-    bool _nextDataType(const std::vector<U> &_vec) {
-        StypeInfos *sTypeInfos_vec(nullptr);
-        StypeInfos *sTypeInfos_var(nullptr);
-        getTypeInfos_byName("std::vector", &sTypeInfos_vec);
-        getTypeInfos_byType(U(), &sTypeInfos_var);
+    //    return (m_ptrSeqCur->type(0, sTypeInfos_vec->typeId()) && m_ptrSeqCur->type(1, sTypeInfos_var->typeId()));
+    //}
 
-        return (m_ptrSeqCur->type(0, sTypeInfos_vec->typeId()) && m_ptrSeqCur->type(1, sTypeInfos_var->typeId()));
-    }
+    //template<typename T>
+    //bool _nextDataType(const T &_var) {
+    //    StypeInfos *sTypeInfos(nullptr);
+    //    getTypeInfos_byType(_var, &sTypeInfos);
 
-    template<typename T>
-    bool _nextDataType(const T &_var) {
-        StypeInfos *sTypeInfos(nullptr);
-        getTypeInfos_byType(_var, &sTypeInfos);
+    //    return m_ptrSeqCur->type(0, sTypeInfos->typeId());
+    //}
 
-        return m_ptrSeqCur->type(0, sTypeInfos->typeId());
-    }
+    //template <typename T, size_t N>
+    //bool _nextDataType(T(&_var)[N]) {
+    //    StypeInfos *sTypeInfos(nullptr);
+    //    getTypeInfos_byType(_var[0], &sTypeInfos);
 
-    template <typename T, size_t N>
-    bool _nextDataType(T(&_var)[N]) {
-        StypeInfos *sTypeInfos(nullptr);
-        getTypeInfos_byType(_var[0], &sTypeInfos);
-
-        return (m_ptrSeqCur->type(0, sTypeInfos->typeId()) && (static_cast<dataCount_t>(N) == static_cast<dataCount_t>(m_ptrSeqCur->count())));
-    }
+    //    return (m_ptrSeqCur->type(0, sTypeInfos->typeId()) && (static_cast<dataCount_t>(N) == static_cast<dataCount_t>(m_ptrSeqCur->count())));
+    //}
 
 
     int nextDataCount() {
@@ -429,25 +471,38 @@ public:
 
 
     template<typename T>
-    void setNextData(const T &_var, int _iCount = 1, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
-        if (!_setNextData_structvar_(_var)) {
-            if (_iCount == 1)
-                _setNextData_template(_var);
-            else
-                _setNextData_template(_var, _iCount);
+    void setNextData(const typeId_t &_ui8TypeId, const T &_var, int _iCount = 1, typename std::enable_if<!std::is_pointer<T>::value >::type* = 0) {
+        int iWriteCursor(0);
+        SnextSequence *sSeq(new SnextSequence());
+        if (!_setNextData_structvar_(sSeq, _var)) {
+            if (_iCount == 1) {
+                auto [iCount, iWeight] = _setNextData_calculateSize(_var);
+                sSeq->setChunkSize(iWeight, iWriteCursor);
+
+                sSeq->setChunkId(_ui8TypeId, iWriteCursor);
+
+                _setNextData_write(sSeq, iWriteCursor, _var);
+            }
+            else {
+                _setNextData_write(sSeq, iWriteCursor, _var, _iCount);
+            }
         }
+        _updateSeqPtr_Set(sSeq);
     }
 
 
     template<typename T>
-    void getNextData(T &_var, int _iCount = 1, typename std::enable_if<!std::is_pointer<T>::value>::type* = 0) {
-        if (!_getNextData_structvar_(_var)) {
-            if (_iCount == 1)
-                _getNextData_template(_var);
-            else
-                _getNextData_template(_var, _iCount);
+    void getNextData(const typeId_t &_ui8TypeId, T &_var, int _iCount = 1, typename std::enable_if<!std::is_pointer<T>::value>::type* = 0) {
+        int iReadCursor(0);
+        if (m_ptrSeqCur->getChunkId(iReadCursor) == _ui8TypeId) {
+            if (!_getNextData_structvar_(m_ptrSeqCur, _var)) {
+                if (_iCount == 1)
+                    _getNextData_retrieve(m_ptrSeqCur, iReadCursor, _var);
+                /*else
+                    _getNextData_template<T>(m_ptrSeqCur, iReadCursor, _iCount);*/
 
-            m_ptrSeqCur = m_ptrSeqCur->nextNode();
+                m_ptrSeqCur = m_ptrSeqCur->nextNode();
+            }
         }
     }
 
@@ -549,11 +604,11 @@ public:
                         ++iNbrTypes;
                     else
                         i = SK_TYPES_NBR_MAX;
-                _iBufferLength += sizeof(typeId_t) * (iNbrTypes + 1);
+                _iBufferLength += static_cast<int>(sizeof(typeId_t)) * (iNbrTypes + 1);
 
 
 
-                _iBufferLength += ((static_cast<int>(::ceil(static_cast<float>(ptrSeq->count()) / static_cast<float>(UINT16_MAX))) + 1) * sizeof(dataCount_t));
+                _iBufferLength += ((static_cast<int>(::ceil(static_cast<float>(ptrSeq->count()) / static_cast<float>(UINT16_MAX))) + 1) * static_cast<int>(sizeof(dataCount_t)));
 
 
 
@@ -714,8 +769,8 @@ private:
         _incrementIndex(ui32DataSize);
     }*/
 
-    template <typename T, size_t N>
-    void _getNextData_template(T(&_var)[N]) {
+    /*template <typename T, size_t N>
+    void _getNextData_template(SnextSequence *_sSeq, T(&_var)[N]) {
         dataCount_t ui16Count(m_ptrSeqCur->count());
 
         StypeInfos *sTypeInfos(nullptr);
@@ -728,11 +783,14 @@ private:
         uint32_t ui32DataSize(sTypeInfos->size() * ui16Count);
 
         ::memcpy(_var, m_ptrSeqCur->buffer(), ui32DataSize);
-    }
+    }*/
 
     template<typename T>
-    void _getNextData_template(T &_var, int _iCount = 1) {
-        dataCount_t ui16Count(m_ptrSeqCur->count());
+    void _getNextData_retrieve(SnextSequence *_sSeq, int &_iReadOffset, T &_var, int _iCount = 1) {
+        T var;
+        _sSeq->readData(var, _iReadOffset);
+        _var = var;
+        /*dataCount_t ui16Count(m_ptrSeqCur->count());
 
         StypeInfos *sTypeInfos(nullptr);
         getTypeInfos_byType(T(), &sTypeInfos);
@@ -743,10 +801,10 @@ private:
 
         uint32_t ui32DataSize(sTypeInfos->size() * ui16Count);
 
-        ::memcpy((void *)&_var, m_ptrSeqCur->buffer(), ui32DataSize);
+        ::memcpy((void *)&_var, m_ptrSeqCur->buffer(), ui32DataSize);*/
     }
     
-    void _getNextData_template(std::string &_var) {
+    /*void _getNextData_template(SnextSequence *_sSeq, std::string &_var) {
         dataCount_t ui16Count(m_ptrSeqCur->count());
 
         StypeInfos *sTypeInfos(nullptr);
@@ -758,11 +816,17 @@ private:
         uint32_t ui32DataSize(sTypeInfos->size() * ui16Count);
 
         _var = std::string(reinterpret_cast<char*>(m_ptrSeqCur->buffer()), ui32DataSize);
-    }
+    }*/
 
-    template<typename U>
-    void _getNextData_template(std::vector<U> &_vec) {
-        dataCount_t ui16Count(m_ptrSeqCur->count());
+    template<class T>
+    void _getNextData_retrieve(SnextSequence *_sSeq, int &_iReadOffset, std::vector<T> &_vec) {
+        int iCount(static_cast<int>(_sSeq->readCount(_iReadOffset)));
+
+        _vec.resize(iCount);
+        for (int i(0); i < iCount; ++i)
+            _getNextData_retrieve(_sSeq, _iReadOffset, _vec[i]);
+
+        /*dataCount_t ui16Count(m_ptrSeqCur->count());
 
         StypeInfos *sTypeInfos_vec(nullptr);
         StypeInfos *sTypeInfos_var(nullptr);
@@ -777,11 +841,11 @@ private:
 
         _vec.resize(ui16Count);
 
-        ::memcpy(&_vec[0], m_ptrSeqCur->buffer(), ui32DataSize);
+        ::memcpy(&_vec[0], m_ptrSeqCur->buffer(), ui32DataSize);*/
     }
 
-    template<typename U, typename V>
-    void _getNextData_template(std::map<U, V> &_map) {
+    /*template<typename U, typename V>
+    void _getNextData_template(SnextSequence *_sSeq, std::map<U, V> &_map) {
         dataCount_t ui16Count(m_ptrSeqCur->count());
 
         StypeInfos *sTypeInfos_map(nullptr),
@@ -811,10 +875,10 @@ private:
 
             _map.insert({ key, val });
         }
-    }
+    }*/
 
     template<typename T>
-    bool _getNextData_structvar_(const T &_var) {
+    bool _getNextData_structvar_(SnextSequence *_sSeq, const T &_var) {
         constexpr bool has_varInfos = requires(T & _var) {
             _var.__v;
         };
@@ -831,7 +895,7 @@ private:
             _updateSeqPtr_Get();
 
             for (int i(0); i < _var.__v.size(); ++i)
-                _getNextData_structvar_run(*_var.__v[i].get());
+                _getNextData_structvar_run(_sSeq, *_var.__v[i].get());
         }
         else
             return false;
@@ -839,16 +903,16 @@ private:
         return true;
     }
 
-    void _getNextData_structvar_run(const SvarInfo_base &_var) {
+    void _getNextData_structvar_run(SnextSequence *_sSeq, const SvarInfo_base &_var) {
         if (_var.isInfoVec()) {
             //std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> &vec = (*reinterpret_cast<std::vector<std::unique_ptr<Cserializing::SvarInfo_base>>>(_var.ptrNode()));
             std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> *vec = reinterpret_cast<std::vector<std::unique_ptr<Cserializing::SvarInfo_base>>*>(_var.ptrNode());
 
             for (int i(0); i < vec->size(); ++i)
-                _getNextData_structvar_run(*vec->at(i).get());
+                _getNextData_structvar_run(_sSeq , *vec->at(i).get());
         }
         else
-            _var.get(this);
+            _var.get(_sSeq, this);
 
         _updateSeqPtr_Get();
     }
@@ -867,13 +931,11 @@ private:
             m_ptrSeqCur = m_ptrSeqCur->nextNode();
     }
 
-    int iTypeIDCur = 0;
-    typeId_t typppes[4] = { 0 };
+
     template <typename T>
-    void _setNextData_template(SnextSequence *sSeq, const T &_var, const int &_iCount = 1) {
-        StypeInfos *sTypeInfos_var(nullptr);
-        getTypeInfos_byType(_var, &sTypeInfos_var);
-        typppes[iTypeIDCur++] = *sTypeInfos_var->typeId();
+    std::tuple<int, int> _setNextData_calculateSize(const T &_var, const int &_iCount = 1) {
+        return std::tuple<int, int>(1, sizeof(T));
+
         /*StypeInfos *sTypeInfos(nullptr);
         getTypeInfos_byType(T(), &sTypeInfos);
         uint32_t ui32DataSize(sTypeInfos->size() * _iCount);
@@ -883,8 +945,21 @@ private:
         _updateSeqPtr_Set(sSeq);*/
     }
 
-    template <typename T, size_t N>
-    void _setNextData_template(const T(&_var)[N]) {
+    template <typename T>
+    void _setNextData_write(SnextSequence *_sSeq, int &_iWriteCursor, const T &_var, const int &_iCount = 1) {
+        _sSeq->writeData(_var, _iWriteCursor);
+
+        /*StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byType(T(), &sTypeInfos);
+        uint32_t ui32DataSize(sTypeInfos->size() * _iCount);
+
+        SnextSequence *sSeq(new SnextSequence(&_var, ui32DataSize, _iCount));
+        sSeq->typeSet(0, sTypeInfos->typeId());
+        _updateSeqPtr_Set(sSeq);*/
+    }
+
+    /*template <typename T, size_t N>
+    void _setNextData_write(SnextSequence *_sSeq, int &_iWriteCursor, const T(&_var)[N]) {
         StypeInfos *sTypeInfos(nullptr);
         getTypeInfos_byType(_var[0], &sTypeInfos);
         uint32_t ui32DataSize(sTypeInfos->size() * N);
@@ -892,14 +967,37 @@ private:
         SnextSequence *sSeq(new SnextSequence(&_var, ui32DataSize, N));
         sSeq->typeSet(0, sTypeInfos->typeId());
         _updateSeqPtr_Set(sSeq);
+    }*/
+
+    template<typename U>
+    std::tuple<int, int> _setNextData_calculateSize(const std::vector<U> &_vec) {
+        int iCount (0),
+            iWeight(sizeof(dataCount_t));
+
+        for (int i(0); i < _vec.size(); ++i) {
+            auto [iGetCount, iGetWeight] = _setNextData_calculateSize(_vec[i]);
+            iCount += iGetCount;
+            iWeight += iGetWeight;
+        }
+
+        return std::tuple<int, int> (iCount, iWeight);
+
+        /*StypeInfos *sTypeInfos(nullptr);
+        getTypeInfos_byType(T(), &sTypeInfos);
+        uint32_t ui32DataSize(sTypeInfos->size() * _iCount);
+
+        SnextSequence *sSeq(new SnextSequence(&_var, ui32DataSize, _iCount));
+        sSeq->typeSet(0, sTypeInfos->typeId());
+        _updateSeqPtr_Set(sSeq);*/
     }
 
     template<typename U>
-    void _setNextData_template(const std::vector<U> &_vec) {
-        StypeInfos *sTypeInfos_vec(nullptr);
-        getTypeInfos_byType(_vec, &sTypeInfos_vec);
-        typppes[iTypeIDCur++] = *sTypeInfos_vec->typeId();
-        _setNextData_template(_vec[0]);
+    void _setNextData_write(SnextSequence *_sSeq, int &_iWriteCursor, const std::vector<U> &_vec) {
+        _sSeq->writeCount(static_cast<dataCount_t>(_vec.size()), _iWriteCursor);
+
+        for (int i(0); i < _vec.size(); ++i)
+            _setNextData_write(_sSeq, _iWriteCursor, _vec[i]);
+
         /*StypeInfos *sTypeInfos_vec(nullptr),
                    *sTypeInfos_var(nullptr);
         getTypeInfos_byName("std::vector", &sTypeInfos_vec);
@@ -915,7 +1013,7 @@ private:
     }
 
     /*template<typename U, typename V>
-    void _setNextData_template(const std::map<U, V> *_map) {
+    void _setNextData_write(SnextSequence *_sSeq, const std::map<U, V> *_map) {
         _chkOperation(Eoperation_Set);
 
         typeId_t   ui8TypeId_map(0),
@@ -942,7 +1040,7 @@ private:
         }
     }*/
 
-    void _setNextData_template(const std::string &_str) {
+    /*void _setNextData_write(SnextSequence *_sSeq, const std::string &_str) {
         std::string str(_str.c_str() + '\0');
 
         StypeInfos *sTypeInfos(nullptr);
@@ -952,10 +1050,10 @@ private:
         SnextSequence *sSeq(new SnextSequence(&str[0], ui32DataSize, static_cast<dataCount_t>(str.length())));
         sSeq->typeSet(0, sTypeInfos->typeId());
         _updateSeqPtr_Set(sSeq);
-    }
+    }*/
 
     template<typename T>
-    bool _setNextData_structvar_(const T &_var) {
+    bool _setNextData_structvar_(SnextSequence *_sSeq, const T &_var) {
         constexpr bool has_varInfos = requires(T &_var) {
             _var.__v;
         };
@@ -964,7 +1062,7 @@ private:
             _setNextData_structvar_prepare(_var);
 
             for (int i(0); i < _var.__v.size(); ++i)
-                _setNextData_structvar_run(*_var.__v[i].get());
+                _setNextData_structvar_run(_sSeq, *_var.__v[i].get());
         }
         else
             return false;
@@ -982,16 +1080,16 @@ private:
         _updateSeqPtr_Set(sSeq);
     }
 
-    void _setNextData_structvar_run(const SvarInfo_base &_var) {
+    void _setNextData_structvar_run(SnextSequence *_sSeq, const SvarInfo_base &_var) {
         if (_var.isInfoVec()) {
             //std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> &vec = (*reinterpret_cast<std::vector<std::unique_ptr<Cserializing::SvarInfo_base>>>(_var.ptrNode()));
             std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> *vec = reinterpret_cast<std::vector<std::unique_ptr<Cserializing::SvarInfo_base>>*>(_var.ptrNode());
             
             for (int i(0); i < vec->size(); ++i)
-                _setNextData_structvar_run(*vec->at(i).get());
+                _setNextData_structvar_run(_sSeq, *vec->at(i).get());
         }
         else
-            _var.set(this);
+            _var.set(_sSeq, this);
     }
 
     //void _setNextData_structvar_var(const SvarInfo_base &_var) {
@@ -999,7 +1097,7 @@ private:
 
     //    if (strTypeName == "std::string") {
     //        //const std::string &str(reinterpret_cast<std::string &>(*reinterpret_cast<std::string *>(_var.ptr())));
-    //        //_setNextData_template(str);
+    //        //_setNextData_write(str);
     //        _var.set(this);
     //    }
     //    else if (strTypeName == "std::vector") {
@@ -1009,7 +1107,7 @@ private:
     //        //using t = decltype(_var.typeIdsNames()[1]->type());
 
     //        //std::vector<t> *vec(reinterpret_cast<std::vector<t>*>(_var.ptr()));
-    //        //_setNextData_template(*vec);
+    //        //_setNextData_write(*vec);
     //    }
     //    else if(strTypeName == "std::map") {
     //        _var.set(this);

@@ -89,6 +89,43 @@ void unitaryTests() {
     //std::unordered_map
     //std::unordered_multiset
     //std::unordered_multimap
+
+
+    // TEST
+    {
+        Cserializing pe;
+
+        std::vector<std::vector<uint8_t>> vecA { {10, 11, 12, 13, 14}, {20, 21}, {30}, {40, 41, 42} };
+        pe.setNextData(250, vecA);
+
+        pe.changeTypeTo_Get();
+
+        std::vector<std::vector<uint8_t>> vecB;
+        pe.getNextData(250, vecB);
+        if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("Get STD::VECTOR failed.");
+    }
+    {
+        Cserializing pe;
+
+        int64_t i64A(INT64_MIN);
+        pe.setNextData(250, i64A);
+
+        pe.changeTypeTo_Get();
+
+        int64_t i64B(0);
+        pe.getNextData(250, i64B);
+        if (SK_COMPARE_INT(i64A, i64B)) throw std::runtime_error("Get T failed.");
+    }
+
+
+
+
+
+
+
+
+
+
     /*
     // STORED DATA -> STACK ARRAY
     {
@@ -118,6 +155,7 @@ void unitaryTests() {
         }
     }
 
+    
     // T
     {
         Cserializing pe;
@@ -132,7 +170,7 @@ void unitaryTests() {
         pe.getNextData(i64B);
         if (SK_COMPARE_INT(i64A, i64B)) throw std::runtime_error("Get T failed.");
     }
-
+   
     // T *
     {
         Cserializing pe;
@@ -221,7 +259,7 @@ void unitaryTests() {
         if (SK_COMPARE_VEC((*vecA), (*vecB))) throw std::runtime_error("Get STD::VECTOR * failed.");
         delete vecA;
         delete vecB;
-    }*/
+    }
 
     // STD::VECTOR [N]
     {
@@ -362,7 +400,7 @@ void unitaryTests() {
     {
 
     }
-
+    */
     Cserializing::desinitialisation();
 
 
