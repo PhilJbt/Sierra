@@ -69,12 +69,8 @@ public:
 *
 */
 void unitaryTests() {
-    Cserializing::initialization(Stest());
-    //vector of vector of builtin_type
-
     //std::byte
     //std::pair
-    //std::tuple
     //std::stack
     //std::deque
     //std::queue
@@ -92,6 +88,68 @@ void unitaryTests() {
 
 
     // TEST
+    {
+        Cserializing pe;
+
+        std::vector<std::vector<std::tuple<uint8_t, float, bool>>> vecA {
+            {
+                {10, 1.f, true},
+                {11, 1.1f, false},
+                {12, 1.2f, true}
+            },
+            {
+                {20, 2.f, false},
+                {21, 2.1f, false}
+            },
+            {
+                {30, 3.f, true}
+            },
+            {
+                {40, 4.0f, false},
+                {41, 4.1f, true},
+                {42, 4.2f, true},
+                {43, 4.3f, false}
+            }
+        };
+        pe.setNextData(42, vecA);
+
+        pe.changeTypeTo_Get();
+
+        std::vector<std::vector<std::tuple<uint8_t, float, bool>>> vecB;
+        pe.getNextData(42, vecB);
+        if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("Get STD::VECTOR failed.");
+    }
+    {
+        Cserializing pe;
+
+        std::vector<std::vector<std::pair<uint8_t, bool>>> vecA {
+            {
+                {10, true},
+                {11, false},
+                {12, true}
+            },
+            {
+                {20, false},
+                {21, false}
+            },
+            {
+                {30, true}
+            },
+            {
+                {40, false},
+                {41, true},
+                {42, true},
+                {43, false}
+            } 
+        };
+        pe.setNextData(37, vecA);
+
+        pe.changeTypeTo_Get();
+
+        std::vector<std::vector<std::pair<uint8_t, bool>>> vecB;
+        pe.getNextData(37, vecB);
+        if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("Get STD::VECTOR failed.");
+    }
     {
         Cserializing pe;
 
@@ -401,7 +459,6 @@ void unitaryTests() {
 
     }
     */
-    Cserializing::desinitialisation();
 
 
     /*
