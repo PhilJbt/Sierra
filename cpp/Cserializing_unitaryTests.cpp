@@ -26,9 +26,9 @@ public:
         NULL;
     }
 
-    std::vector<uint8_t> vec = { 0, 127, 255 };
+    std::vector<uint8_t> vec;
 
-    TEST(vec);
+    //TEST(vec);
 };
 
 struct Stest_child1 {
@@ -37,31 +37,33 @@ public:
         NULL;
     }
 
-    std::string str = "qzd";
+    std::string str = "";
+    int8_t i8Arr[3] = { 0 };
 
     Stest_child2 s2;
 
-    TEST(str, s2);
+    //TEST(str, i8Arr, s2);
 };
 
 struct Stest {
 public:
-    Stest(int _i, float _f, std::string _str) {
+    /*Stest(int _i, float _f, std::string _str) {
         i = _i;
         f = _f;
         ::strcpy_s(cz, 5, _str.data());
-    }
+    }*/
 
     Stest() {
     }
 
-    int   i = 1;
-    float f = 2.2f;
-    char  cz[5] { '3' };
+    int   i = 0;
+    /*float f = .0f;
+    char  cz[5] { 0 };
 
-    Stest_child1 s1;
+    Stest_child1 s1;*/
 
-    TEST(i, f, cz, s1);
+    //TEST(i, f, cz, s1);
+    TEST(i);
 };
 
 /*
@@ -69,6 +71,8 @@ public:
 *
 */
 void unitaryTests() {
+    //std::vector SIZE == 0
+    //SERIALIZE
     //std::byte
     //std::pair
     //std::stack
@@ -91,31 +95,81 @@ void unitaryTests() {
     {
         Cserializing pe;
 
-        std::vector<std::vector<std::tuple<uint8_t, float, bool>>> vecA {
+        Stest sTestA;
+        sTestA.i = 5;
+        pe.setNextData(250, sTestA);
+
+        pe.changeTypeTo_Get();
+
+        Stest sTestB;
+        pe.getNextData(250, sTestB);
+    }
+    /*
+    {
+        Cserializing pe;
+
+        Stest sTestA(9, 1.0f, "O0Tt");
+        sTestA.s1.str = "iaLC";
+        sTestA.s1.i8Arr[0] = INT8_MIN;
+        sTestA.s1.i8Arr[1] = 0;
+        sTestA.s1.i8Arr[2] = INT8_MAX;
+        sTestA.s1.s2.vec = { 0, 127, 255 };
+        pe.setNextData(42, sTestA);
+
+        pe.changeTypeTo_Get();
+
+        Stest sTestB;
+        pe.getNextData(42, sTestA);
+        if (SK_COMPARE_INT(sTestA.i,            sTestB.i)
+            || SK_COMPARE_FLT(sTestA.f,         sTestB.f)
+            || SK_COMPARE_CZ(sTestA.cz,         sTestB.cz)
+            || SK_COMPARE_ARR(sTestA.s1.i8Arr,  sTestB.s1.i8Arr, 3)
+            || SK_COMPARE_STR(sTestA.s1.str,    sTestB.s1.str)
+            || SK_COMPARE_VEC(sTestA.s1.s2.vec, sTestB.s1.s2.vec)
+            ) throw std::runtime_error("Get STRUCT failed.");
+    }
+    {
+        Cserializing pe;
+        
+        int64_t i64ArrA[64] { 0 };
+        for (int i(0); i < 64; ++i)
+            i64ArrA[i] = rand() % ((INT64_MAX - INT64_MIN) + INT64_MIN);
+        pe.setNextData(42, i64ArrA);
+
+        pe.changeTypeTo_Get();
+
+        int64_t i64ArrB[64] { 0 };
+        pe.getNextData(42, i64ArrB);
+        if (SK_COMPARE_ARR(i64ArrA, i64ArrB, 64)) throw std::runtime_error("Get ARR failed.");
+    }
+    {
+        Cserializing pe;
+
+        std::vector<std::vector<std::tuple<uint8_t, float, std::string>>> vecA {
             {
-                {10, 1.f, true},
-                {11, 1.1f, false},
-                {12, 1.2f, true}
+                {10, 1.f, "dix"},
+                {11, 1.1f, "onze"},
+                {12, 1.2f, "douze"}
             },
             {
-                {20, 2.f, false},
-                {21, 2.1f, false}
+                {20, 2.f, "vingt"},
+                {21, 2.1f, "vingt et un"}
             },
             {
-                {30, 3.f, true}
+                {30, 3.f, "trente"}
             },
             {
-                {40, 4.0f, false},
-                {41, 4.1f, true},
-                {42, 4.2f, true},
-                {43, 4.3f, false}
+                {40, 4.0f, "quarante"},
+                {41, 4.1f, "quarante et un"},
+                {42, 4.2f, "quarante deux"},
+                {43, 4.3f, "quarante trois"}
             }
         };
         pe.setNextData(42, vecA);
 
         pe.changeTypeTo_Get();
 
-        std::vector<std::vector<std::tuple<uint8_t, float, bool>>> vecB;
+        std::vector<std::vector<std::tuple<uint8_t, float, std::string>>> vecB;
         pe.getNextData(42, vecB);
         if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("Get STD::VECTOR failed.");
     }
@@ -174,7 +228,7 @@ void unitaryTests() {
         pe.getNextData(250, i64B);
         if (SK_COMPARE_INT(i64A, i64B)) throw std::runtime_error("Get T failed.");
     }
-
+    */
 
 
 
