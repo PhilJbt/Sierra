@@ -1,7 +1,4 @@
 #include <iostream>
-#include <typeinfo>
-#include <typeindex>
-#include <any>
 
 
 #include "Cserializing.hpp"
@@ -11,14 +8,15 @@
     #define execute (main)
 #endif
 
-#define SK_COMPARE_INT(INTA, INTB) (INTA != INTB)
-#define SK_COMPARE_FLT(FLTA, FLTB) (::fabs(FLTA - FLTB) > std::numeric_limits<float>::epsilon())
-#define SK_COMPARE_CZ(CZA, CZB)    (::strcmp(CZA, CZB) != 0)
-#define SK_COMPARE_ARR(ARRA, ARRB, SIZE) (::memcmp(ARRA, ARRB, SIZE) != 0)
-#define SK_COMPARE_ARRPTR(ARRA, ARRB, SIZE) (::memcmp(ARRA, ARRB, sizeof(ARRA[0]) * SIZE) != 0)
-#define SK_COMPARE_VEC(VECA, VECB) (VECA != VECB)
-#define SK_COMPARE_MAP(MAPA, MAPB) (MAPA != MAPB)
-#define SK_COMPARE_STR(STRA, STRB) (STRA != STRB)
+#define SK_COMPARE_INT(INTA,        INTB)                   (INTA != INTB)
+#define SK_COMPARE_BOOL(BOOLA,      BOOLB)                  (BOOLA != BOOLB)
+#define SK_COMPARE_FLT(FLTA,        FLTB)                   (::fabs(FLTA - FLTB) > std::numeric_limits<float>::epsilon())
+#define SK_COMPARE_CZ(CZA,          CZB)                    (::strcmp(CZA, CZB) != 0)
+#define SK_COMPARE_ARR(ARRA,        ARRB,       SIZE)       (::memcmp(ARRA, ARRB, sizeof(ARRA[0]) * SIZE) != 0)
+#define SK_COMPARE_ARRPTR(ARRA,     ARRB,       SIZE)       (::memcmp(ARRA, ARRB, sizeof(ARRA[0]) * SIZE) != 0)
+#define SK_COMPARE_VEC(VECA,        VECB)                   (VECA != VECB)
+#define SK_COMPARE_MAP(MAPA,        MAPB)                   (MAPA != MAPB)
+#define SK_COMPARE_STR(STRA,        STRB)                   (STRA != STRB)
 
 struct Stest_child2 {
 public:
@@ -70,9 +68,6 @@ public:
 *
 */
 void unitaryTests() {
-    //std::vector SIZE == 0
-    //SERIALIZE
-    //std::byte
     //std::pair
     //std::stack
     //std::deque
@@ -88,7 +83,91 @@ void unitaryTests() {
     //std::unordered_map
     //std::unordered_multiset
     //std::unordered_multimap
-    
+
+    // STD::PAIR
+    {
+        Cserializing pe;
+
+        std::pair<uint8_t, bool> varA(5, true);
+        pe.setNextData(0, varA);
+
+        pe.changeTypeTo_Get();
+
+        std::pair<uint8_t, bool> varB;
+        if (!SK_COMPARE_INT(varA.first, varB.first) || !SK_COMPARE_BOOL(varA.second, varB.second)) throw std::runtime_error("");
+        pe.getNextData(0, varB);
+        if (SK_COMPARE_INT(varA.first, varB.first) || SK_COMPARE_BOOL(varA.second, varB.second)) throw std::runtime_error("");
+    }
+
+    // STD::PAIR *
+    {
+        Cserializing pe;
+
+        std::pair<uint8_t, bool> *varA(new std::pair<uint8_t, bool>());
+        varA->first  = UINT8_MAX;
+        varA->second = true;
+        pe.setNextData(0, varA, 1);
+
+        pe.changeTypeTo_Get();
+
+        std::pair<uint8_t, bool> *varB(new std::pair<uint8_t, bool>());
+        if (!SK_COMPARE_INT(varA->first, varB->first) || !SK_COMPARE_BOOL(varA->second, varB->second)) throw std::runtime_error("");
+        pe.getNextData(0, varB, 1);
+        if (SK_COMPARE_INT(varA->first, varB->first) || SK_COMPARE_BOOL(varA->second, varB->second)) throw std::runtime_error("");
+        delete varA;
+        delete varB;
+    }
+
+    // STD::PAIR [N]
+    {
+        Cserializing pe;
+
+        std::pair<uint8_t, bool> varA[3];
+        varA[0].first = UINT8_MAX;
+        varA[0].second = true;
+        varA[1].first = 111;
+        varA[1].second = false;
+        varA[2].first = INT8_MIN;
+        varA[2].second = true;
+        pe.setNextData(0, varA);
+
+        pe.changeTypeTo_Get();
+
+        std::pair<uint8_t, bool> varB[3];
+        varB[1].second = true;
+        for (int i(0); i < 3; ++i)
+            if (!SK_COMPARE_INT(varA[i].first, varB[i].first) || !SK_COMPARE_BOOL(varA[i].second, varB[i].second)) throw std::runtime_error("");
+        pe.getNextData(0, varB);
+        for (int i(0); i < 3; ++i)
+            if (SK_COMPARE_INT(varA[i].first, varB[i].first) || SK_COMPARE_BOOL(varA[i].second, varB[i].second)) throw std::runtime_error("");
+    }
+
+    // STD::PAIR * [N]
+    {
+        Cserializing pe;
+
+        std::pair<uint8_t, bool> *varA(new std::pair<uint8_t, bool>[3]);
+        varA[0].first = UINT8_MAX;
+        varA[0].second = true;
+        varA[1].first = 111;
+        varA[1].second = false;
+        varA[2].first = INT8_MIN;
+        varA[2].second = true;
+        pe.setNextData(0, varA, 3);
+
+        pe.changeTypeTo_Get();
+
+        std::pair<uint8_t, bool> *varB(new std::pair<uint8_t, bool>[3]);
+        varB[1].second = true;
+        for (int i(0); i < 3; ++i)
+            if (!SK_COMPARE_INT(varA[i].first, varB[i].first) || !SK_COMPARE_BOOL(varA[i].second, varB[i].second)) throw std::runtime_error("");
+        pe.getNextData(0, varB, 3);
+        for (int i(0); i < 3; ++i)
+            if (SK_COMPARE_INT(varA[i].first, varB[i].first) || SK_COMPARE_BOOL(varA[i].second, varB[i].second)) throw std::runtime_error("");
+        delete[] varA;
+        delete[] varB;
+    }
+
 
     // OPTIMISATIONS
     {
@@ -266,6 +345,7 @@ void unitaryTests() {
         pe.changeTypeTo_Get();
 
         int64_t i64B(0);
+        if (!SK_COMPARE_INT(i64A, i64B)) throw std::runtime_error("");
         pe.getNextData(250, i64B);
         if (SK_COMPARE_INT(i64A, i64B)) throw std::runtime_error("");
     }
@@ -282,13 +362,14 @@ void unitaryTests() {
 
         int64_t *i64B(new int64_t);
         i64B[0] = 0;
+        if (!SK_COMPARE_INT(*i64A, *i64B)) throw std::runtime_error("");
         pe.getNextData(250, i64B, 1);
-        if (SK_COMPARE_ARR(i64A, i64B, sizeof(i64A))) throw std::runtime_error("");
+        if (SK_COMPARE_INT(*i64A, *i64B)) throw std::runtime_error("");
         delete i64A;
         delete i64B;
     }
     
-    // T[N]
+    // T [N]
     {
         Cserializing pe;
 
@@ -304,6 +385,7 @@ void unitaryTests() {
         i64B[0] = 0;
         i64B[1] = 0;
         i64B[2] = 0;
+        if (!SK_COMPARE_ARR(i64A, i64B, 3)) throw std::runtime_error("");
         pe.getNextData(250, i64B);
         if (SK_COMPARE_ARR(i64A, i64B, 3)) throw std::runtime_error("");
     }
@@ -320,6 +402,7 @@ void unitaryTests() {
         pe.changeTypeTo_Get();
 
         int64_t i64ArrB[64] { 0 };
+        if (!SK_COMPARE_ARR(i64ArrA, i64ArrB, 64)) throw std::runtime_error("");
         pe.getNextData(42, i64ArrB);
         if (SK_COMPARE_ARR(i64ArrA, i64ArrB, 64)) throw std::runtime_error("");
     }
@@ -340,6 +423,7 @@ void unitaryTests() {
         i64B[0] = 0;
         i64B[1] = 0;
         i64B[2] = 0;
+        if (!SK_COMPARE_ARR(i64A, i64B, 3)) throw std::runtime_error("");
         pe.getNextData(250, i64B, 3);
         if (SK_COMPARE_ARR(i64A, i64B, 3)) throw std::runtime_error("");
         delete[] i64A;
@@ -356,6 +440,7 @@ void unitaryTests() {
         pe.changeTypeTo_Get();
 
         std::vector<uint8_t> vecB;
+        if (!SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
         pe.getNextData(0, vecB);
         if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
     }
@@ -370,6 +455,7 @@ void unitaryTests() {
         pe.changeTypeTo_Get();
 
         std::vector<uint8_t> *vecB(new std::vector<uint8_t>());
+        if (!SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
         pe.getNextData(0, vecB, 1);
         if (SK_COMPARE_VEC((*vecA), (*vecB))) throw std::runtime_error("");
         delete vecA;
@@ -391,11 +477,12 @@ void unitaryTests() {
         pe.changeTypeTo_Get();
 
         std::vector<std::vector<uint8_t>> vecB;
+        if (!SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
         pe.getNextData(250, vecB);
         if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
     }
     
-    // // STD::VECTOR<STD::VECTOR<STD::PAIR<UINT8, BOOL>>>
+    // STD::VECTOR<STD::VECTOR<STD::PAIR<UINT8, BOOL>>>
     {
         Cserializing pe;
 
@@ -424,6 +511,7 @@ void unitaryTests() {
         pe.changeTypeTo_Get();
 
         std::vector<std::vector<std::pair<uint8_t, bool>>> vecB;
+        if (!SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
         pe.getNextData(37, vecB);
         if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
     }
@@ -457,53 +545,181 @@ void unitaryTests() {
         pe.changeTypeTo_Get();
 
         std::vector<std::vector<std::tuple<uint8_t, float, std::string>>> vecB;
+        if (!SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
         pe.getNextData(42, vecB);
         if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
     }
 
     // STD::VECTOR<STD::VECTOR> [N]
     {
+        Cserializing pe;
 
+        std::vector<std::vector<std::string>> vecA = {
+            { "8aVj3lSS", "1OXTs", "aytQ6m4" },
+            { "eYa60NC", "51jYH0Y", "PstZJ0oy", "ZVhAE", "PcJfpJb" },
+            { "YDHdOl" },
+            { "8xElm", "XpC8WZR6", "pY63Y1rW", "TrIE3z6", "kWP5", "L2GWQOL", "OZ2F" }
+        };
+        pe.setNextData(14, vecA);
+
+        pe.changeTypeTo_Get();
+
+        std::vector<std::vector<std::string>> vecB;
+
+        if (!SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
+        pe.getNextData(14, vecB);
+        if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
     }
 
     // STD::STRING
     {
+        Cserializing pe;
 
+        std::string strA("OZ2FhLMeF");
+        pe.setNextData(52, strA);
+
+        pe.changeTypeTo_Get();
+
+        std::string strB;
+
+        if (!SK_COMPARE_STR(strA, strB)) throw std::runtime_error("");
+        pe.getNextData(52, strB);
+        if (SK_COMPARE_STR(strA, strB)) throw std::runtime_error("");
     }
     
     // STD::STRING *
     {
-        
+        Cserializing pe;
+
+        std::string *strA(new std::string("OZ2FhLMeF"));
+        pe.setNextData(52, strA, 1);
+
+        pe.changeTypeTo_Get();
+
+        std::string *strB(new std::string());
+        if (!SK_COMPARE_STR(*strA, *strB)) throw std::runtime_error("");
+        pe.getNextData(52, strB, 1);
+        if (SK_COMPARE_STR(*strA, *strB)) throw std::runtime_error("");
+        delete strA;
+        delete strB;
     }
 
     // STD::STRING [N]
     {
+        Cserializing pe;
 
+        std::string strA[3] = {
+            "XprC8R6",
+            "pY63W",
+            "TrGIE3z6"
+        };
+        pe.setNextData(42, strA);
+
+        pe.changeTypeTo_Get();
+
+        std::string strB[3];
+        for (int i(0); i < 3; ++i)
+            if (!SK_COMPARE_STR(strA[i], strB[i])) throw std::runtime_error("");
+        pe.getNextData(42, strB);
+        for (int i(0); i < 3; ++i)
+            if (SK_COMPARE_STR(strA[i], strB[i])) throw std::runtime_error("");
     }
 
     // STD::STRING * [N]
     {
+        Cserializing pe;
 
+        std::string *strA(new std::string[3]);
+        strA[0] = "XprC8R6";
+        strA[1] = "pY63W";
+        strA[2] = "TrGIE3z6";
+        pe.setNextData(42, strA, 3);
+
+        pe.changeTypeTo_Get();
+
+        std::string *strB(new std::string[3]);
+        for (int i(0); i < 3; ++i)
+            if (!SK_COMPARE_STR(strA[i], strB[i])) throw std::runtime_error("");
+        pe.getNextData(42, strB, 3);
+        for (int i(0); i < 3; ++i)
+            if (SK_COMPARE_STR(strA[i], strB[i])) throw std::runtime_error("");
+        delete[] strA;
+        delete[] strB;
     }
     
-    // STD::WSTRING
+    // STD::U32STRING
     {
+        Cserializing pe;
+        
+        std::u32string u32strA(U"\U000030C6\U000030EC\U000030D3\U000030B2\U000030FC\U000030E0");
+        pe.setNextData(52, u32strA);
 
+        pe.changeTypeTo_Get();
+
+        std::u32string u32strB;
+        if (!SK_COMPARE_STR(u32strA, u32strB)) throw std::runtime_error("");
+        pe.getNextData(52, u32strB);
+        if (SK_COMPARE_STR(u32strA, u32strB)) throw std::runtime_error("");
     }
 
-    // STD::WSTRING *
+    // STD::U32STRING *
     {
+        Cserializing pe;
 
+        std::u32string *u32strA(new std::u32string((U"\U00000070\U00000101\U000002BB\U00000061\U0000006E\U00000069\U00000020\U00000077\U00000069\U0000006B\U00000069\U0000014D")));
+        pe.setNextData(20, u32strA, 1);
+
+        pe.changeTypeTo_Get();
+
+        std::u32string *u32strB(new std::u32string());
+        if (!SK_COMPARE_STR(*u32strA, *u32strB)) throw std::runtime_error("");
+        pe.getNextData(20, u32strB, 1);
+        if (SK_COMPARE_STR(*u32strA, *u32strB)) throw std::runtime_error("");
     }
 
-    // STD::WSTRING [N]
+    // STD::U32STRING [N]
     {
+        Cserializing pe;
 
+        std::u32string u32strA[4] = {
+            U"\U000030C6\U000030EC\U000030D3\U000030B2\U000030FC\U000030E0",
+            U"\U0000BE44\U0000B514\U0000C624\U00000020\U0000AC8C\U0000C784",
+            U"\U00000074\U00000072\U000000F2\U00000020\U00000063\U00000068\U000001A1\U00000069\U00000020\U00000111\U00000069\U00001EC7\U0000006E\U00000020\U00000074\U00001EED",
+            U"\U00000070\U00000101\U000002BB\U00000061\U0000006E\U00000069\U00000020\U00000077\U00000069\U0000006B\U00000069\U0000014D"
+        };
+        pe.setNextData(52, u32strA);
+
+        pe.changeTypeTo_Get();
+
+        std::u32string u32strB[4];
+        for (int i(0); i < 4; ++i)
+            if (!SK_COMPARE_STR(u32strA[i], u32strB[i])) throw std::runtime_error("");
+        pe.getNextData(52, u32strB);
+        for (int i(0); i < 4; ++i)
+            if (SK_COMPARE_STR(u32strA[i], u32strB[i])) throw std::runtime_error("");
     }
 
-    // STD::WSTRING * [N]
+    // STD::U32STRING * [N]
     {
+        Cserializing pe;
 
+        std::u32string *u32strA(new std::u32string[4]);
+        u32strA[0] = U"\U000030C6\U000030EC\U000030D3\U000030B2\U000030FC\U000030E0";
+        u32strA[1] = U"\U0000BE44\U0000B514\U0000C624\U00000020\U0000AC8C\U0000C784";
+        u32strA[2] = U"\U00000074\U00000072\U000000F2\U00000020\U00000063\U00000068\U000001A1\U00000069\U00000020\U00000111\U00000069\U00001EC7\U0000006E\U00000020\U00000074\U00001EED";
+        u32strA[3] = U"\U00000070\U00000101\U000002BB\U00000061\U0000006E\U00000069\U00000020\U00000077\U00000069\U0000006B\U00000069\U0000014D";
+        pe.setNextData(52, u32strA, 4);
+
+        pe.changeTypeTo_Get();
+
+        std::u32string *u32strB(new std::u32string[4]);
+        for (int i(0); i < 4; ++i)
+            if (!SK_COMPARE_STR(u32strA[i], u32strB[i])) throw std::runtime_error("");
+        pe.getNextData(52, u32strB, 4);
+        for (int i(0); i < 4; ++i)
+            if (SK_COMPARE_STR(u32strA[i], u32strB[i])) throw std::runtime_error("");
+        delete[] u32strA;
+        delete[] u32strB;
     }
 
     // STD::MAP
@@ -623,14 +839,13 @@ void unitaryTests() {
         Stest sTestB[3];
         pe.getNextData(250, sTestB);
 
-        for (int i(0); i < 3; ++i) {
+        for (int i(0); i < 3; ++i)
             if (SK_COMPARE_INT(sTestA[i].i, sTestB[i].i)
                 || SK_COMPARE_FLT(sTestA[i].f, sTestB[i].f)
                 || SK_COMPARE_CZ(sTestA[i].cz, sTestB[i].cz)
                 || SK_COMPARE_ARR(sTestA[i].s1.i8Arr, sTestB[i].s1.i8Arr, 3)
                 || SK_COMPARE_STR(sTestA[i].s1.str, sTestB[i].s1.str)
                 || SK_COMPARE_VEC(sTestA[i].s1.s2.vec, sTestB[i].s1.s2.vec)) throw std::runtime_error("");
-        }
     }
     
     // CUSTOM DATA STRUCTURE * [N]
@@ -678,14 +893,13 @@ void unitaryTests() {
         sTestB[2].f = 3.3f;
         pe.getNextData(250, sTestB, 3);
 
-        for (int i(0); i < 3; ++i) {
+        for (int i(0); i < 3; ++i)
             if (SK_COMPARE_INT(sTestA[i].i, sTestB[i].i)
                 || SK_COMPARE_FLT(sTestA[i].f, sTestB[i].f)
                 || SK_COMPARE_CZ(sTestA[i].cz, sTestB[i].cz)
                 || SK_COMPARE_ARR(sTestA[i].s1.i8Arr, sTestB[i].s1.i8Arr, 3)
                 || SK_COMPARE_STR(sTestA[i].s1.str, sTestB[i].s1.str)
                 || SK_COMPARE_VEC(sTestA[i].s1.s2.vec, sTestB[i].s1.s2.vec)) throw std::runtime_error("");
-        }
         delete[] sTestA;
         delete[] sTestB;
     }
