@@ -84,6 +84,29 @@ void unitaryTests() {
     //std::unordered_multiset
     //std::unordered_multimap
 
+    {
+        Cserializing pe;
+
+        std::vector<std::pair<uint8_t, bool>> vecPairBA = {
+            {8,     false},
+            {92,    true},
+            {111,   false},
+            {70,    false},
+            {30,    true},
+            {45,    true},
+            {210,   false},
+            {7,     false},
+            {50,    true},
+            {1,     false}
+        };
+        pe.setNextData(4, vecPairBA);
+
+        pe.changeTypeTo_Get();
+
+        std::vector<std::pair<uint8_t, bool>> vecPairBB;
+        pe.getNextData(4, vecPairBB);
+    }
+    /*
     // STD::PAIR
     {
         Cserializing pe;
@@ -192,6 +215,42 @@ void unitaryTests() {
         ptrArrBA[9] = true;
         pe.setNextData(2, ptrArrBA, 10);
 
+        std::pair<uint8_t, bool> arrPairBA[10] = {
+            {1,     true},
+            {50,    false},
+            {7,     true},
+            {210,   true},
+            {45,    false},
+            {30,    false},
+            {70,    true},
+            {111,   true},
+            {92,    false},
+            {8,     true}
+        };
+        pe.setNextData(3, arrPairBA);
+
+        std::vector<std::pair<uint8_t, bool>> vecPairBA = {
+            {8,     false},
+            {92,    true},
+            {111,   false},
+            {70,    false},
+            {30,    true},
+            {45,    true},
+            {210,   false},
+            {7,     false},
+            {50,    true},
+            {1,     false}
+        };
+        pe.setNextData(4, vecPairBA);
+
+        // [] PAIR T, BOOL
+
+        // * [] PAIR T, BOOL
+
+        // [] TUPLE T, T, BOOL
+
+        // * [] TUPLE T, T, BOOL
+
         pe.changeTypeTo_Get();
 
         std::vector<bool> vecBoolB;
@@ -209,6 +268,41 @@ void unitaryTests() {
         if (!SK_COMPARE_ARRPTR(ptrArrBA, ptrArrBB, 10)) throw std::runtime_error("");
         pe.getNextData(2, ptrArrBB, 10);
         if (SK_COMPARE_ARRPTR(ptrArrBA, ptrArrBB, 10)) throw std::runtime_error("");
+
+        std::pair<uint8_t, bool> arrPairBB[10];
+        arrPairBB[0].second = false;
+        arrPairBB[1].second = true;
+        arrPairBB[2].second = false;
+        arrPairBB[3].second = false;
+        arrPairBB[4].second = true;
+        arrPairBB[5].second = true;
+        arrPairBB[6].second = false;
+        arrPairBB[7].second = false;
+        arrPairBB[8].second = true;
+        arrPairBB[9].second = false;
+        for (int i(0); i < 3; ++i)
+            if (!SK_COMPARE_INT(arrPairBA[i].first, arrPairBB[i].first) || !SK_COMPARE_BOOL(arrPairBA[i].second, arrPairBB[i].second)) throw std::runtime_error("");
+        pe.getNextData(0, arrPairBB);
+        for (int i(0); i < 3; ++i)
+            if (SK_COMPARE_INT(arrPairBA[i].first, arrPairBB[i].first) || SK_COMPARE_BOOL(arrPairBA[i].second, arrPairBB[i].second)) throw std::runtime_error("");
+
+        std::vector<std::pair<uint8_t, bool>> vecPairBB;
+        for (int i(0); i < 3; ++i)
+            if (!SK_COMPARE_VEC(vecPairBA[i].first, vecPairBB[i].first) || !SK_COMPARE_BOOL(vecPairBA[i].second, vecPairBB[i].second)) throw std::runtime_error("");
+        pe.getNextData(0, vecPairBB);
+        for (int i(0); i < 3; ++i)
+            if (SK_COMPARE_VEC(vecPairBA[i].first, vecPairBB[i].first) || SK_COMPARE_BOOL(vecPairBA[i].second, vecPairBB[i].second)) throw std::runtime_error("");
+
+
+        // vec pair T, bool
+
+        // arr tuple T, U, bool
+
+        // vec tuple T, U, bool
+
+
+
+
 
         delete[] ptrArrBA;
         delete[] ptrArrBB;
@@ -903,6 +997,7 @@ void unitaryTests() {
         delete[] sTestA;
         delete[] sTestB;
     }
+    */
 }
 
 
