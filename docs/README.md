@@ -1,3 +1,5 @@
+![Sierra logo](sierra.png)
+
 # INDEX
 
 | [PRESENSATION](#presentation) &#65293; [HOW IT WORKS](#how-it-works) &#65293; [USAGE](#usage) &#65293; [BENCHMARK](#benchmark) |
