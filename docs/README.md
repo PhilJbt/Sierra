@@ -1,4 +1,4 @@
-![Sierra logo](logo.png)
+![Sierra logo](logo_v1.png)
 
 
 &#160;
