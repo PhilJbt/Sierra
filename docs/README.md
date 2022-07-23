@@ -1,5 +1,14 @@
 ![Sierra logo](logo.png)
 
+
+&#160;
+
+```diff
+- ⚠️ STILL IN DEVELOPMEN, DO NOT USE IT FOR PRODUCTION IN ITS CURRENT STATE ⚠️ -
+```
+
+&#160;
+
 # INDEX
 
 | [PRESENSATION](#presentation) &#65293; [HOW IT WORKS](#how-it-works) &#65293; [USAGE](#usage) &#65293; [BENCHMARK](#benchmark) |
