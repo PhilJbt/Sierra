@@ -1,4 +1,4 @@
-![Sierra logo](sierra.png)
+![Sierra logo](logo.png)
 
 # INDEX
 
