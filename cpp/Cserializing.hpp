@@ -55,16 +55,16 @@ public:
     public:
         virtual ~SvarInfo_base() {}
 
-        elemCnt_t                                                count()     const { return m_ui16ElemCount; }
+        elemCnt_t                                                  count()     const { return m_ui16ElemCount; }
         std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> *ptrNode()   const { return m_ptrNode; }
         bool                                                       isInfoVec() const { return m_bIsVarInfosVec; }
 
-        virtual int calcsize(Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) const { return 0; }
+        virtual int calcsize() const { return 0; }
         virtual void write(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) const {}
         virtual void read(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) const {}
 
     protected:
-        elemCnt_t                                                m_ui16ElemCount = 0;
+        elemCnt_t                                                  m_ui16ElemCount = 0;
         std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> *m_ptrNode = nullptr;
         bool                                                       m_bIsVarInfosVec = false;
     };
@@ -77,8 +77,8 @@ public:
                 _storeVar(_var);
         }
 
-        int calcsize(Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) const {
-            return _ptrSerializer->_setNextData_calcSize(m_ptrVar, _ui16ElemCount, true);
+        int calcsize() {
+            return Cserializing ::_setNextData_calcSize(&m_ptrVar, true, m_ui16ElemCount);
         }
 
         void write(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) {
@@ -86,7 +86,7 @@ public:
         }
 
         void read(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) {
-            _ptrSerializer->_getNextData_read_(_iReadOffset, m_ptrVar, _ui16ElemCount);
+            _ptrSerializer->_getNextData_read_(_iReadOffset, m_ptrVar);
         }
 
     private:
@@ -181,13 +181,14 @@ public:
         */
         template <typename T>
         void readData(int &_iOffset, T *_var, const elemCnt_t &_ui16ElemCount) {
-            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(_var, _ui16ElemCount, false));
+            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(&_var, false, _ui16ElemCount));
 
+            ::memset(_var, 0, ui16DataSize);
             ::memcpy(_var, &m_ui8ArrBuffer[_iOffset], ui16DataSize);
             _iOffset += ui16DataSize;
         }
 
-        /*void readData(std::string &_str, int &_iReadOffset) {
+        void readData(int &_iReadOffset, std::string &_str) {
             const elemCnt_t ui16BytesLen(readCount(_iReadOffset));
 
             _str.resize(ui16BytesLen / sizeof(_str[0]));
@@ -195,7 +196,7 @@ public:
             _iReadOffset += ui16BytesLen;
         }
 
-        void readData(std::u32string &_32str, int &_iReadOffset) {
+        void readData(int &_iReadOffset, std::u32string &_32str) {
             const elemCnt_t ui16BytesLen(readCount(_iReadOffset));
 
             _32str.resize(ui16BytesLen / sizeof(_32str[0]));
@@ -203,9 +204,9 @@ public:
             _iReadOffset += ui16BytesLen;
         }
 
-        template<typename T>
-        void readData(T *_arr, int &_iReadOffset, elemCnt_t _ui16ElemCount) {
-            const elemCnt_t ui16ArrLen(std::min(readCount(_iReadOffset), _ui16ElemCount));
+        /*template<typename T>
+        void readData(int &_iReadOffset, T *_arr, elemCnt_t _ui16ElemCount) {
+            const elemCnt_t ui16ArrLen(readCount(_iReadOffset));
 
             ::memset(&_arr[0], 0, ui16ArrLen);
             ::memcpy(&_arr[0], &m_ui8ArrBuffer[_iReadOffset], ui16ArrLen);
@@ -217,27 +218,27 @@ public:
         */
         template <typename T>
         void writeData(int &_iOffset, const T * const _var, const elemCnt_t &_ui16ElemCount) {
-            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(_var, _ui16ElemCount, false));
+            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(&_var, false, _ui16ElemCount));
             ::memcpy(&m_ui8ArrBuffer[_iOffset], _var, ui16DataSize);
             _iOffset += ui16DataSize;
         }
 
-        /*void writeData(const std::string &_str, int &_iOffset) {
-            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(_str, false));
-            writeCount(ui16DataSize, _iOffset);
+        void writeData(int &_iOffset, const std::string *const _str) {
+            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(&_str, false));
+            writeCount(_iOffset, ui16DataSize);
 
-            ::memcpy(&m_ui8ArrBuffer[_iOffset], _str.data(), ui16DataSize);
+            ::memcpy(&m_ui8ArrBuffer[_iOffset], _str->data(), ui16DataSize);
             _iOffset += ui16DataSize;
         }
 
-        void writeData(const std::u32string &_32str, int &_iOffset) {
-            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(_32str, false));
-            writeCount(ui16DataSize, _iOffset);
+        void writeData(int &_iOffset, const std::u32string *const _32str) {
+            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(&_32str, false));
+            writeCount(_iOffset, ui16DataSize);
 
-            ::memcpy(&m_ui8ArrBuffer[_iOffset], _32str.data(), ui16DataSize);
+            ::memcpy(&m_ui8ArrBuffer[_iOffset], _32str->data(), ui16DataSize);
             _iOffset += ui16DataSize;
         }
-
+        /*
         void writeData(const uint8_t *_ptr, int &_iOffset, const elemCnt_t &_ui16ElemCount) {
             ::memcpy(&m_ui8ArrBuffer[_iOffset], _ptr, _ui16ElemCount);
             _iOffset += _ui16ElemCount;
@@ -247,7 +248,7 @@ public:
         void writeData(const T * const _arr, int &_iOffset, const elemCnt_t &_ui16ElemCount) {
             writeCount(_ui16ElemCount, _iOffset);
 
-            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(_arr, false));
+            const elemCnt_t ui16DataSize(Cserializing::_setNextData_calcSize(&_arr, false));
             ::memcpy(&m_ui8ArrBuffer[_iOffset], &_arr[0], ui16DataSize);
             _iOffset += ui16DataSize;
         }*/
@@ -356,34 +357,56 @@ public:
         return static_cast<int>(m_ptrSeqCur->readCount(iOffset));
     }
 
-    template<typename T, std::enable_if_t<!std::is_pointer_v<T> && !std::is_array_v<T>>* = nullptr>
-    auto setNextData(const typeId_t &_ui8TypeId, const T &_var) {
+
+    /*
+    ** SET / GET
+    */
+
+    // SET
+    template<typename T>
+    void setNextData(const typeId_t &_ui8TypeId, const T &_var) {
         _setNextData_write(_ui8TypeId, &_var, 1);
     }
 
-    template<typename T, std::enable_if_t<std::is_pointer_v<T> && !std::is_array_v<T>>* = nullptr>
-    auto setNextData(const typeId_t &_ui8TypeId, const T _var, const elemCnt_t &_ui16ElemCount) {
+    template<typename T, size_t N>
+    void setNextData(const typeId_t &_ui8TypeId, const T (&_var)[N]) {
+        _setNextData_write(_ui8TypeId, &_var[0], N);
+    }
+
+    template<typename T>
+    void setNextData(const typeId_t &_ui8TypeId, const T * const  * const _var, const elemCnt_t &_ui16ElemCount) {
         _setNextData_write(_ui8TypeId, _var, _ui16ElemCount);
     }
 
 
-    template<typename T, std::enable_if_t<!std::is_pointer_v<T> && !std::is_array_v<T>>* = nullptr>
-    auto getNextData(const typeId_t &_ui8TypeId, T &_var) {
+    // GET
+    template<typename T>
+    void getNextData(const typeId_t &_ui8TypeId, T &_var) {
         int iReadCursor(0);
         if (m_ptrSeqCur->getChunkId(iReadCursor) == _ui8TypeId) {
             m_ptrSeqCur->chunkIdPassed(iReadCursor);
 
-            _getNextData_read(iReadCursor, &_var, 1);
+            _getNextData_read(iReadCursor, &_var);
         }
     }
 
-    template<typename T, std::enable_if_t<std::is_pointer_v<T> && !std::is_array_v<T>>* = nullptr>
-    auto getNextData(const typeId_t &_ui8TypeId, T _var, const elemCnt_t &_ui16ElemCount) {
+    template<typename T, size_t N>
+    void getNextData(const typeId_t &_ui8TypeId, const T(&_var)[N]) {
         int iReadCursor(0);
         if (m_ptrSeqCur->getChunkId(iReadCursor) == _ui8TypeId) {
             m_ptrSeqCur->chunkIdPassed(iReadCursor);
 
-            _getNextData_read(iReadCursor, _var, _ui16ElemCount);
+            _getNextData_read(iReadCursor, &_var[0]);
+        }
+    }
+
+    template<typename T>
+    void getNextData(const typeId_t &_ui8TypeId, T **_var) {
+        int iReadCursor(0);
+        if (m_ptrSeqCur->getChunkId(iReadCursor) == _ui8TypeId) {
+            m_ptrSeqCur->chunkIdPassed(iReadCursor);
+
+            _getNextData_read(iReadCursor, _var);
         }
     }
 
@@ -439,102 +462,527 @@ private:
     }
 
     /*
-    ** GETNEXTDATA_RETRIEVE
+    ** WRITE / CALCSIZE / READ
     */
 
-    // R ENTRY POINT
+    /*
+    ** ENTRY POINT
+    */
+
+    // WRITE ENTRY POINT
     template<typename T>
-    void _getNextData_read(int &_iOffset, T * _var, const elemCnt_t &_ui16ElemCount) {
-        _getNextData_read_(_iOffset, _var, _ui16ElemCount);
+    void _setNextData_write(const typeId_t &_ui8TypeId, const T *const *const _var, const elemCnt_t &_ui16ElemCount) {
+        int iOffset(0),
+            iSize(_setNextData_calcSize(_var, true, _ui16ElemCount));
+
+        _setNextData_initSeq(_ui8TypeId, static_cast<elemCnt_t>(iSize), iOffset);
+
+        /*if (_setNextData_write_userstruct_check(_var, _ui16ElemCount))
+            _setNextData_write_userstruct(iOffset, _var, _ui16ElemCount);
+        else*/
+            _setNextData_write_(iOffset, _var, _ui16ElemCount);
+    }
+
+    // CALC ENTRY POINT
+    template<typename T>
+    static int _setNextData_calcSize(const T *const *const _var, const bool &_bIncludeElemeCntSize, const elemCnt_t &_ui16ElemCount) {
+        return _setNextData_calcSize_(_var, _bIncludeElemeCntSize, _ui16ElemCount);
+    }
+
+    template<typename T>
+    static int _setNextData_calcSize(const T *const *const _var, const bool &_bIncludeElemeCntSize) {
+        return _setNextData_calcSize_(_var, _bIncludeElemeCntSize);
+    }
+
+    // READ ENTRY POINT
+    template<typename T>
+    void _getNextData_read(int &_iOffset, T ** _var) {
+        /*if (_setNextData_write_userstruct_check(_var, _ui16ElemCount))
+            _setNextData_write_userstruct(iWriteCursor, _var, _ui16ElemCount);
+        else*/
+            _getNextData_read_(_iOffset, _var);
 
         _updateSeqPtr_Get();
     }
 
-    // R BUFFER
-    // ... ?
 
-    // R * T
-    // R * [] T
-    template<typename T, std::enable_if_t<std::is_fundamental_v<T>>* = nullptr>
-    auto _getNextData_read_(int &_iOffset, T * _var, const elemCnt_t &_ui16ElemCount) {
+    /*
+            USERSTRUCT
+    */
+
+    // WRITE USERSTRUCT
+    template<typename T>
+    bool _setNextData_write_userstruct_check(const T *const _var, const elemCnt_t &_ui16ElemCount) {
+        constexpr bool hasVarInfos = requires(const T *const _var) {
+            _var->__v;
+        };
+
+        if constexpr (hasVarInfos)
+            return true;
+        else
+            return false;
+    }
+
+    /*template<typename T>
+    void _setNextData_write_userstruct(const int &_iOffset, const T *const _var, const elemCnt_t &_ui16ElemCount) {
+        _setNextData_userstruct_unfold(_iOffset, iWeight, _var->__v);
+    }*/
+
+    // CALC USERSTRUCT
+    /*template <typename T>
+    static int _setNextData_calcSize_(const T *const _var, const bool &_bIncludeElemeCntSize, const elemCnt_t &_ui16ElemCount) {
+        _setNextData_userstruct_unfold(_iOffset, iWeight, _var->__v);
+    }*/
+
+    // READ USERSTRUCT
+    // ...
+
+
+    /*
+    ** BUFFER
+    */
+
+    // WRITE BUFFER
+    void _setNextData_write_rawdata(int &_iOffset, const uint8_t *const _ptr, const elemCnt_t &_ui16DataLen, const elemCnt_t &_ui16ElemCount) {
+        //m_ptrSeqCur->writeCount(_iOffset, _ui16ElemCount);
+        m_ptrSeqCur->writeData(_iOffset, _ptr, _ui16DataLen);
+    }
+
+    // CALC BUFFER
+    // ...
+
+    // READ BUFFER
+    // ...
+
+
+    /*
+            * T
+            * [] T
+    */
+
+    // WRITE * * T
+    // WRITE * * [] T
+    template<typename T>
+    void _setNextData_write_(int &_iOffset, const T *const *const _var, const elemCnt_t &_ui16ElemCount = 1) {
+        m_ptrSeqCur->writeCount(_iOffset, _ui16ElemCount);
+
+        for (size_t i(0); i < _ui16ElemCount; ++i)
+            _setNextData_write_(_iOffset, &((*_var)[i]));
+    }
+
+    // CALC * * T
+    // CALC * * [] T
+    template<typename T>
+    static int _setNextData_calcSize_(const T *const *const _var, const bool &_bIncludeElemeCntSize, const elemCnt_t &_ui16ElemCount = 1) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
+
+        for (elemCnt_t i(0); i < _ui16ElemCount; ++i)
+            iWeight += _setNextData_calcSize_(&((*_var)[i]), _bIncludeElemeCntSize);
+
+        return iWeight;
+    }
+
+    // READ * * T
+    // READ * * [] T
+    template<typename T>
+    void _getNextData_read_(int &_iOffset, T **_var) {
         elemCnt_t ui16Count(m_ptrSeqCur->readCount(_iOffset));
-        size_t iSize(std::min(_ui16ElemCount, ui16Count));
 
+        for (elemCnt_t i(0); i < ui16Count; ++i)
+            _getNextData_read_(_iOffset, &((*_var)[i]));
+    }
+
+
+    // WRITE * T
+    // WRITE * [] T
+    template<typename T>
+        requires (std::is_fundamental<T>::value)
+    void _setNextData_write_(int &_iOffset, const T *const _var) {
+        if (typeid(T) == typeid(const bool))
+            _opti_bool_concat(_iOffset, this, 1, reinterpret_cast<const bool *>(_var));
+        else
+            m_ptrSeqCur->writeData(_iOffset, &(*_var), 1);
+    }
+
+    template<typename T>
+        requires (std::is_fundamental<T>::value)
+    void _setNextData_write_(int &_iOffset, const T *const _var, const elemCnt_t &_ui16ElemCount) {
+        if (typeid(T) == typeid(const bool))
+            _opti_bool_concat(_iOffset, this, _ui16ElemCount, reinterpret_cast<const bool *>(_var));
+        else {
+            m_ptrSeqCur->writeCount(_iOffset, _ui16ElemCount);
+            m_ptrSeqCur->writeData(_iOffset, &(*_var), _ui16ElemCount);
+        }
+    }
+
+    template<typename T>
+        requires (!std::is_fundamental<T>::value)
+    void _setNextData_write_(int &_iOffset, const T *const _var, const elemCnt_t &_ui16ElemCount) {
+        m_ptrSeqCur->writeCount(_iOffset, _ui16ElemCount);
+
+        for (size_t i(0); i < _ui16ElemCount; ++i)
+            _setNextData_write_(_iOffset, &(_var[i]));
+    }
+
+    // CALC * T
+    // CALC * [] T
+    template<typename T>
+        requires (std::is_fundamental<T>::value)
+    static int _setNextData_calcSize_(const T *const _var, const bool &_bIncludeElemeCntSize) {
+        int iWeight(0);
+
+        if (typeid(T) == typeid(const bool))
+            iWeight += _opti_bool_calcsize(1);
+        else
+            iWeight += static_cast<int>(sizeof(*_var));
+
+        return iWeight;
+    }
+
+    template<typename T>
+        requires (std::is_fundamental<T>::value)
+    static int _setNextData_calcSize_(const T *const _var, const bool &_bIncludeElemeCntSize, const elemCnt_t &_ui16ElemCount) {
+        int iWeight(0);
+
+        if (typeid(T) == typeid(const bool)) {
+            iWeight += (_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
+            iWeight += _opti_bool_calcsize(_ui16ElemCount);
+        }
+        else {
+            if (_bIncludeElemeCntSize)
+                iWeight += sizeof(elemCnt_t);
+            iWeight += static_cast<int>(sizeof(*_var)) * static_cast<int>(_ui16ElemCount);
+        }
+
+        return iWeight;
+    }
+
+    template<typename T>
+        requires (!std::is_fundamental<T>::value)
+    static int _setNextData_calcSize_(const T *const _var, const bool &_bIncludeElemeCntSize, const elemCnt_t &_ui16ElemCount) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
+
+        for (elemCnt_t i(0); i < _ui16ElemCount; ++i)
+            iWeight += _setNextData_calcSize_(&(_var[i]), _bIncludeElemeCntSize);
+
+        return iWeight;
+    }
+
+    // READ * T
+    // READ * [] T
+    template <typename T>
+        requires (std::is_fundamental<T>::value)
+    void _getNextData_read_(int &_iOffset, T * _var, const elemCnt_t &_ui16ElemCount) {
         if (typeid(T) == typeid(bool)) {
-            bool *bArrTemp(new bool[iSize]);
-            _opti_bool_discat(_iOffset, ui16Count, bArrTemp);
+            bool *bArrTemp(new bool[_ui16ElemCount]);
+            _opti_bool_discat(_iOffset, _ui16ElemCount, bArrTemp);
 
-            for (size_t i(0); i < iSize; ++i)
+            for (size_t i(0); i < _ui16ElemCount; ++i)
                 _var[i] = bArrTemp[i];
 
             delete[] bArrTemp;
         }
         else 
-            m_ptrSeqCur->readData(_iOffset, _var, static_cast<elemCnt_t>(iSize));
+            m_ptrSeqCur->readData(_iOffset, &(*_var), _ui16ElemCount);
     }
 
-    // R * pair<T, U>
-
-
-    // R * tuple<T, U, ...>
-
-
-    // R * [] pair<T, U>
-
-
-    // R * [] tuple<T, ...>
-
-
-    // R * vector<T>
     template<typename T>
-    void _getNextData_read_(int &_iOffset, std::vector<T> *_vec, const elemCnt_t &_ui16ElemCount) {
-        elemCnt_t ui16Count(m_ptrSeqCur->readCount(_iOffset));
-        size_t iSize(std::min(_ui16ElemCount, ui16Count));
+        requires (!std::is_fundamental<T>::value)
+    void _getNextData_read_(int &_iOffset, T * _var, const elemCnt_t &_ui16ElemCount) {
+        for (elemCnt_t i(0); i < _ui16ElemCount; ++i)
+            _getNextData_read_(_iOffset, &(_var[i]));
+    }
+
+
+    /*
+            * PAIR<T, U>
+    */
+
+    // WRITE * PAIR<T, U>
+    // ...
+
+    // CALC * PAIR<T, U>
+    // ...
+
+    // READ * PAIR<T, U>
+    // ...
+
+
+    /*
+            * TUPLE<T, U, ...>
+    */
+
+    // WRITE * TUPLE<T, U, ...>
+    // ...
+
+    // CALC * TUPLE<T, U, ...>
+    // ...
+
+    // READ * TUPLE<T, U, ...>
+    // ...
+
+    /*
+            * [] PAIR<T, U>
+    */
+
+    // WRITE * [] PAIR<T, U>
+    // ...
+
+    // CALC * [] PAIR<T, U>
+    // ...
+
+    // READ * [] PAIR<T, U>
+    // ...
+
+
+    /*
+            * [] TUPLE<T, ...>
+    */
+
+    // WRITE * [] TUPLE<T, ...>
+    // ...
+
+    // CALC * [] TUPLE<T, ...>
+    // ...
+
+    // READ * [] TUPLE<T, ...>
+    // ...
+
+
+    /*
+            * VECTOR<T>
+    */
+
+    // WRITE * VECTOR<T>
+    template<typename T>
+        requires (std::is_fundamental<T>::value)
+    void _setNextData_write_(int &_iOffset, const std::vector<T> *const _vec) {
+        const size_t iSize(_vec->size());
+        m_ptrSeqCur->writeCount(_iOffset, static_cast<elemCnt_t>(iSize));
+
+        if (typeid(T) == typeid(const bool)) {
+            bool *arrTemp(new bool[iSize]);
+            ::memset(arrTemp, 0, iSize);
+            for (size_t i(0); i < iSize; ++i)
+                arrTemp[i] = ((*_vec)[i]);
+
+            _opti_bool_concat(_iOffset, this, static_cast<elemCnt_t>(iSize), arrTemp);
+
+            delete[] arrTemp;
+        }
+        else
+            for (size_t i(0); i < iSize; ++i)
+                _setNextData_write_(_iOffset, &((*_vec)[i]), 1);
+    }
+
+    template<typename T>
+        requires (!std::is_fundamental<T>::value)
+    void _setNextData_write_(int &_iOffset, const std::vector<T> *const _vec) {
+        const size_t iSize(_vec->size());
+        m_ptrSeqCur->writeCount(_iOffset, static_cast<elemCnt_t>(iSize));
 
         for (size_t i(0); i < iSize; ++i)
-            _getNextData_read_(_iOffset, _vec[i], _ui16ElemCount);
+            _setNextData_write_(_iOffset, &((*_vec)[i]));
     }
 
-    // R * vector<pair<T, U>>
-    template<typename T, typename U>
-    void _getNextData_read_(int &_iOffset, std::vector<std::pair<T, U>> *_vec, const elemCnt_t &_ui16ElemCount) {
-        elemCnt_t ui16Count(m_ptrSeqCur->readCount(_iOffset));
-        size_t iSize(std::min(_ui16ElemCount, ui16Count));
+    // CALC * VECTOR<T>
+    template<typename T>
+        requires (std::is_fundamental<T>::value)
+    static int _setNextData_calcSize_(const std::vector<T> *const _vec, const bool &_bIncludeElemeCntSize) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
+        const size_t iSize(_vec->size());
 
-        _vec.resize(iSize);
+        if (typeid(T) == typeid(const bool))
+            iWeight += _opti_bool_calcsize(iSize);
+        else
+            for (size_t i(0); i < iSize; ++i)
+                _setNextData_calcSize_(&((*_vec)[i]), _bIncludeElemeCntSize);
+
+        return iWeight;
+    }
+
+    template<typename T>
+        requires (!std::is_fundamental<T>::value)
+    static int _setNextData_calcSize_(const std::vector<T> *const _vec, const bool &_bIncludeElemeCntSize) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
+        const size_t iSize(_vec->size());
+
+        for (size_t i(0); i < iSize; ++i)
+            iWeight += _setNextData_calcSize_(&((*_vec)[i]), _bIncludeElemeCntSize);
+
+        return iWeight;
+    }
+
+    // READ * VECTOR<T>
+    template<typename T>
+        requires (std::is_fundamental<T>::value)
+    void _getNextData_read_(int &_iOffset, std::vector<T> *_vec) {
+        elemCnt_t ui16Count(m_ptrSeqCur->readCount(_iOffset));
+
+        if (typeid(T) == typeid(const bool)) {
+            bool *arrTemp(new bool[ui16Count]);
+            ::memset(arrTemp, 0, ui16Count);
+            for (size_t i(0); i < ui16Count; ++i)
+                arrTemp[i] = ((*_vec)[i]);
+
+            _opti_bool_concat(_iOffset, this, ui16Count, arrTemp);
+
+            delete[] arrTemp;
+        }
+        else
+            for (size_t i(0); i < ui16Count; ++i)
+                _getNextData_read_(_iOffset, &((*_vec)[i]));
+    }
+
+    template<typename T>
+        requires (!std::is_fundamental<T>::value)
+    void _getNextData_read_(int &_iOffset, std::vector<T> *_vec) {
+        elemCnt_t ui16Count(m_ptrSeqCur->readCount(_iOffset));
+
+        _vec->resize(ui16Count);
+
+        for (size_t i(0); i < ui16Count; ++i)
+            _getNextData_read_(_iOffset, &((*_vec)[i]));
+    }
+
+
+    /*
+            * VECTOR<PAIR<T, U>>
+    */
+
+    // WRITE * VECTOR<PAIR<T, U>>
+    template<typename T, typename U>
+    void _setNextData_write_(int &_iOffset, const std::vector<std::pair<T, U>> *const _vec) {
+        const size_t iSize(_vec->size());
+
+        m_ptrSeqCur->writeCount(_iOffset, static_cast<elemCnt_t>(iSize));
 
         if (typeid(T) == typeid(bool)) {
-            const int iCountBools(static_cast<int>(m_ptrSeqCur->readCount(_iOffset)));
+            bool *ui8ArrRaw(new bool[iSize]);
+            ::memset(ui8ArrRaw, 0, iSize);
 
-            bool *bArrTemp(new bool[iCountBools]);
-            _opti_bool_discat(_iOffset, iCountBools, bArrTemp);
+            for (size_t i(0); i < iSize; ++i)
+                ui8ArrRaw[i] = ((*_vec)[i]).first;
 
-            for (int i(0); i < iCountBools; ++i)
-                _vec[i].first = bArrTemp[i];
+            _opti_bool_concat(_iOffset, this, static_cast<elemCnt_t>(iSize), ui8ArrRaw);
 
-            delete[] bArrTemp;
+            delete[] ui8ArrRaw;
         }
         else
-            for (size_t i(0); i < iSize; ++i)
-                _getNextData_read_(_iOffset, _vec[i], _ui16ElemCount);
+            for (int i(0); i < iSize; ++i)
+                _setNextData_write_(_iOffset, &(((*_vec)[i].first)));
 
         if (typeid(U) == typeid(bool)) {
-            const int iCountBools(static_cast<int>(m_ptrSeqCur->readCount(_iOffset)));
+            bool *ui8ArrRaw(new bool[iSize]);
+            ::memset(ui8ArrRaw, 0, iSize);
+
+            for (size_t i(0); i < iSize; ++i)
+                ui8ArrRaw[i] = ((*_vec)[i]).second;
+
+            _opti_bool_concat(_iOffset, this, static_cast<elemCnt_t>(iSize), ui8ArrRaw);
+
+            delete[] ui8ArrRaw;
+        }
+        else
+            for (size_t i(0); i < iSize; ++i)
+                _setNextData_write_(_iOffset, &(((*_vec)[i]).second));
+    }
+
+    // CALC * VECTOR<PAIR<T, U>>
+    template<typename T, typename U>
+    static int _setNextData_calcSize_(const std::vector<std::pair<T, U>> *const _vec, const bool &_bIncludeElemeCntSize) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
+        const size_t iSize(_vec->size());
+
+        if (typeid(T) == typeid(bool))
+            iWeight += _opti_bool_calcsize(iSize);
+        else
+            for (int i(0); i < iSize; ++i)
+                iWeight += _setNextData_calcSize_(&(((*_vec)[i]).first), _bIncludeElemeCntSize);
+
+        if (typeid(U) == typeid(bool))
+            iWeight += _opti_bool_calcsize(iSize);
+        else
+            for (size_t i(0); i < iSize; ++i)
+                iWeight += _setNextData_calcSize_(&(((*_vec)[i]).second), _bIncludeElemeCntSize);
+
+        return iWeight;
+    }
+
+    // READ * VECTOR<PAIR<T, U>>
+    template<typename T, typename U>
+    void _getNextData_read_(int &_iOffset, std::vector<std::pair<T, U>> *_vec) {
+        elemCnt_t ui16Count(m_ptrSeqCur->readCount(_iOffset));
+
+        _vec->resize(ui16Count);
+
+        if (typeid(T) == typeid(bool)) {
+            const int iCountBools(ui16Count);
 
             bool *bArrTemp(new bool[iCountBools]);
             _opti_bool_discat(_iOffset, iCountBools, bArrTemp);
 
             for (int i(0); i < iCountBools; ++i)
-                _vec[i].second = bArrTemp[i];
+                ((*_vec)[i]).first = bArrTemp[i];
 
             delete[] bArrTemp;
         }
         else
-            for (size_t i(0); i < iSize; ++i)
-                _getNextData_read_(_iOffset, _vec[i], _ui16ElemCount);
+            for (size_t i(0); i < ui16Count; ++i)
+                _getNextData_read_(_iOffset, &(((*_vec)[i]).first), 1);
+
+        if (typeid(U) == typeid(bool)) {
+            const int iCountBools(ui16Count);
+
+            bool *bArrTemp(new bool[iCountBools]);
+            _opti_bool_discat(_iOffset, iCountBools, bArrTemp);
+
+            for (int i(0); i < iCountBools; ++i)
+                ((*_vec)[i]).second = bArrTemp[i];
+
+            delete[] bArrTemp;
+        }
+        else
+            for (size_t i(0); i < ui16Count; ++i)
+                _getNextData_read_(_iOffset, &(((*_vec)[i]).second), 1);
     }
 
-    // R * vector<tuple<T, ...>>
+
+    /*
+            * VECTOR<TUPLE<T, ...>>
+    */
+
+    // WRITE * VECTOR<TUPLE<T, ...>>
+    // ...
+
+    // CALC * VECTOR<TUPLE<T, ...>>
+    // ...
+
+    // READ * VECTOR<TUPLE<T, ...>>
+    // ...
+
+
+    /*
+            STRING, U32STRING
+    */
+
+    // CALC STRING
+    static int _setNextData_calcSize_(const std::string *const _str, const bool &_bIncludeElemeCntSize) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
+
+        iWeight += static_cast<uint32_t>(_str->length()) * static_cast<uint32_t>(sizeof(_str[0]));
+
+        return iWeight;
+    }
+
+    // CALC U32STRING
+    static int _setNextData_calcSize_(const std::u32string *const _32str, const bool &_bIncludeElemeCntSize) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
+
+        iWeight += static_cast<uint32_t>(_32str->length()) * static_cast<uint32_t>(sizeof(_32str[0]));
+
+        return iWeight;
+    }
 
 
 
@@ -560,27 +1008,19 @@ private:
     }*/
 
 
-    /*
-    ** SETNEXTDATA_CALCULATESIZE
-    */
-    template <typename T, std::enable_if_t<std::is_pointer_v<T>>* = nullptr>
-    static auto _setNextData_calcSize(const T &_var, const elemCnt_t &_ui16ElemCount, const bool &_bIncludeSize) {
-        return static_cast<int>(sizeof(*_var)) * static_cast<int>(_ui16ElemCount);
-    }
-
     /*template<typename T, std::enable_if_t<std::is_pointer_v<T> && !std::is_same_v<T, bool*>>* = nullptr>
-    static auto _setNextData_calcSize(const T _ptr, const bool &_bIncludeSize, const elemCnt_t &_ui16ElemCount) {
-        int iWeight(_bIncludeSize ? sizeof(elemCnt_t) : 0);
+    static auto _setNextData_calcSize_(const T _ptr, const bool &_bIncludeElemeCntSize, const elemCnt_t &_ui16ElemCount) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
 
         for (elemCnt_t i(0); i < _ui16ElemCount; ++i)
-            iWeight += _setNextData_calcSize(_ptr[i], true);
+            iWeight += _setNextData_calcSize_(_ptr[i], true);
 
         return iWeight;
     }
 
     template<typename T, std::enable_if_t<std::is_pointer_v<T> && std::is_same_v<T, bool*>>* = nullptr>
-    static auto _setNextData_calcSize(const T _ptr, const bool &_bIncludeSize, const elemCnt_t &_ui16ElemCount) {
-        int iWeight(_bIncludeSize ? sizeof(elemCnt_t) : 0);
+    static auto _setNextData_calcSize_(const T _ptr, const bool &_bIncludeElemeCntSize, const elemCnt_t &_ui16ElemCount) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
 
         iWeight += _opti_bool_calcsize(_ui16ElemCount);
 
@@ -588,8 +1028,8 @@ private:
     }
 
     template <size_t N>
-    static int _setNextData_calcSize(const bool(&_arr)[N], const bool &_bIncludeSize) {
-        int iWeight(_bIncludeSize ? sizeof(elemCnt_t) : 0);
+    static int _setNextData_calcSize_(const bool(&_arr)[N], const bool &_bIncludeElemeCntSize) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
 
         iWeight += _opti_bool_calcsize(N);
 
@@ -597,17 +1037,17 @@ private:
     }
 
     template<typename T, typename U>
-    static int _setNextData_calcSize(const std::pair<T, U> &_pair, const bool &_bIncludeSize) {
+    static int _setNextData_calcSize_(const std::pair<T, U> &_pair, const bool &_bIncludeElemeCntSize) {
         int iWeight(0);
 
-        iWeight += _setNextData_calcSize(_pair.first, true);
-        iWeight += _setNextData_calcSize(_pair.second, true);
+        iWeight += _setNextData_calcSize_(_pair.first, true);
+        iWeight += _setNextData_calcSize_(_pair.second, true);
 
         return iWeight;
     }
 
-    static int _setNextData_calcSize(const std::vector<bool> &_vec, const bool &_bIncludeSize) {
-        int iWeight(_bIncludeSize ? sizeof(elemCnt_t) : 0);
+    static int _setNextData_calcSize_(const std::vector<bool> &_vec, const bool &_bIncludeElemeCntSize) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
 
         iWeight += _opti_bool_calcsize(_vec.size());
 
@@ -615,236 +1055,66 @@ private:
     }
 
     template<typename T, typename U, std::enable_if_t<!std::is_same_v<T, bool> && !std::is_same_v<U, bool>>* = nullptr>
-    static auto _setNextData_calcSize(const std::vector<std::pair<T, U>> &_vec, const bool &_bIncludeSize) {
-        int iWeight(_bIncludeSize ? sizeof(elemCnt_t) : 0);
+    static auto _setNextData_calcSize_(const std::vector<std::pair<T, U>> &_vec, const bool &_bIncludeElemeCntSize) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
 
         const size_t iSize(_vec.size());
         for (int i(0); i < iSize; ++i) {
-            iWeight += _setNextData_calcSize(_vec[i].first, true);
-            iWeight += _setNextData_calcSize(_vec[i].second, true);
+            iWeight += _setNextData_calcSize_(_vec[i].first, true);
+            iWeight += _setNextData_calcSize_(_vec[i].second, true);
         }
 
         return iWeight;
     }
     
     template<typename T, typename U>
-        static int _setNextData_calcSize(const std::vector<std::pair<T, U>> &_vec, const bool &_bIncludeSize) {
+        static int _setNextData_calcSize_(const std::vector<std::pair<T, U>> &_vec, const bool &_bIncludeElemeCntSize) {
         const size_t iSize(sizeof(elemCnt_t));
-        int iWeight(_bIncludeSize ? iSize : 0);
+        int iWeight(_bIncludeElemeCntSize ? iSize : 0);
 
         const size_t iSize(_vec.size());
         if (typeid(T) == typeid(bool)) {
             iWeight += iSize;
             iWeight += _opti_bool_calcsize(iSize);
             for (int i(0); i < iSize; ++i)
-                iWeight += _setNextData_calcSize(_vec[i].second, true);
+                iWeight += _setNextData_calcSize_(_vec[i].second, true);
         }
         
         if (typeid(U) == typeid(bool)) {
             iWeight += iSize;
             iWeight += _opti_bool_calcsize(iSize);
             for (int i(0); i < iSize; ++i)
-                iWeight += _setNextData_calcSize(_vec[i].first, true);
+                iWeight += _setNextData_calcSize_(_vec[i].first, true);
         }
 
         return iWeight;
     }
 
     template<typename T>
-    static int _setNextData_calcSize(const std::vector<T> &_vec, const bool &_bIncludeSize) {
-        int iWeight(_bIncludeSize ? sizeof(elemCnt_t) : 0);
+    static int _setNextData_calcSize_(const std::vector<T> &_vec, const bool &_bIncludeElemeCntSize) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
 
         const size_t iSize(_vec.size());
         for (int i(0); i < iSize; ++i)
-            iWeight += _setNextData_calcSize(_vec[i], true);
+            iWeight += _setNextData_calcSize_(_vec[i], true);
 
         return iWeight;
     }
 
     template <size_t I = 0, typename... T>
     static typename std::enable_if<I == sizeof...(T), int>::type
-        _setNextData_calcSize(const std::tuple<T...> &_tuple, const bool &_bIncludeSize) {
+        _setNextData_calcSize_(const std::tuple<T...> &_tuple, const bool &_bIncludeElemeCntSize) {
         return 0;
     }
     template <size_t I = 0, typename... T>
     static typename std::enable_if<(I < sizeof...(T)), int>::type
-        _setNextData_calcSize(const std::tuple<T...> &_tuple, const bool &_bIncludeSize) {
-        int iWeight(_setNextData_calcSize(std::get<I>(_tuple), true));
+        _setNextData_calcSize_(const std::tuple<T...> &_tuple, const bool &_bIncludeElemeCntSize) {
+        int iWeight(_setNextData_calcSize_(std::get<I>(_tuple), true));
         iWeight += _setNextData_calcSize<I + 1>(_tuple, true);
 
         return iWeight;
     }
-
-    static int _setNextData_calcSize(const std::string &_str, const bool &_bIncludeSize) {
-        int iWeight(static_cast<uint32_t>(_str.length()) * static_cast<uint32_t>(sizeof(_str[0])));
-
-        if (_bIncludeSize)
-            iWeight += sizeof(elemCnt_t);
-
-        return iWeight;
-    }
-
-    static int _setNextData_calcSize(const std::u32string &_32str, const bool &_bIncludeSize) {
-        int iWeight(static_cast<uint32_t>(_32str.length()) * static_cast<uint32_t>(sizeof(_32str[0])));
-
-        if (_bIncludeSize)
-            iWeight += sizeof(elemCnt_t);
-
-        return iWeight;
-    }*/
-
-
-    /*
-    ** SETNEXTDATA_WRITE
     */
-
-    // W ENTRY POINT
-    template<typename T>
-    void _setNextData_write(const typeId_t &_ui8TypeId, const T * const _var, const elemCnt_t &_ui16ElemCount) {
-        int iWriteCursor(0),
-            iSize(_setNextData_calcSize(_var, _ui16ElemCount, true));
-
-        _setNextData_initSeq(_ui8TypeId, static_cast<elemCnt_t>(iSize), iWriteCursor);
-
-        if (_setNextData_write_userstruct_check(_var, _ui16ElemCount))
-            _setNextData_write_userstruct(iWriteCursor, _var, _ui16ElemCount);
-        else
-            _setNextData_write_(iWriteCursor, _var, _ui16ElemCount);
-    }
-
-
-    // W CHECK USERSTRUCT
-    template<typename T>
-    bool _setNextData_write_userstruct_check(const T * const _var, const elemCnt_t &_ui16ElemCount) {
-        constexpr bool hasVarInfos = requires(const T * const _var) {
-            _var->__v;
-        };
-
-        if constexpr (hasVarInfos)
-            return true;
-        else
-            return false;
-    }
-
-    // W PROCESS USERSTRUCT
-    template<typename T>
-    void _setNextData_write_userstruct(const int &_iOffset, const T *const _var, const elemCnt_t &_ui16ElemCount) {
-        //_setNextData_userstruct_unfold(_iOffset, iWeight, _var->__v);
-    }
-
-
-    // W BUFFER
-    void _setNextData_write_rawdata(int &_iOffset, const uint8_t *const _ptr, const elemCnt_t &_ui16DataLen, const elemCnt_t &_ui16ElemCount) {
-        m_ptrSeqCur->writeCount(_iOffset, _ui16ElemCount);
-        m_ptrSeqCur->writeData(_iOffset, _ptr, _ui16DataLen);
-    }
-
-    // W * T
-    // W * [] T
-    template<typename T>
-        requires (std::is_fundamental<T>::value)
-    void _setNextData_write_(int &_iOffset, const T * const _var, const elemCnt_t &_ui16ElemCount) {
-        if (typeid(T) == typeid(const bool))
-            _opti_bool_concat(_iOffset, this, _ui16ElemCount, reinterpret_cast<const bool *>(_var));
-        else {
-            if (_ui16ElemCount > 0)
-                m_ptrSeqCur->writeCount(_iOffset, _ui16ElemCount);
-            m_ptrSeqCur->writeData(_iOffset, &(*_var), _ui16ElemCount);
-        }
-    }
-
-    template<typename T>
-        requires (!std::is_fundamental<T>::value)
-    void _setNextData_write_(int &_iOffset, const T * const _var, const elemCnt_t &_ui16ElemCount) {
-        for (elemCnt_t i(0); i < _ui16ElemCount; ++i)
-            _setNextData_write_(_iOffset, &(_var[i]), 1);
-    }
-
-    // W * pair<T, U>
-
-
-    // W * tuple<T, U, ...>
-
-
-    // W * [] pair<T, U>
-
-
-    // W * [] tuple<T, ...>
-
-
-    // W * vector<T>
-    template<typename T>
-        requires (std::is_fundamental<T>::value)
-    void _setNextData_write_(int &_iOffset, const std::vector<T> *const _vec, const elemCnt_t &_ui16ElemCount) {
-        const size_t iSize(_vec->size());
-        m_ptrSeqCur->writeCount(_iOffset, static_cast<elemCnt_t>(iSize));
-
-        if (typeid(T) == typeid(const bool)) {
-            bool *arrTemp(new bool[iSize]);
-            ::memset(arrTemp, 0, iSize);
-            for (size_t i(0); i < iSize; ++i)
-                arrTemp[i] = ((*_vec)[i]);
-
-            _opti_bool_concat(_iOffset, this, static_cast<elemCnt_t>(iSize), arrTemp);
-
-            delete[] arrTemp;
-        }
-        else
-            for (size_t i(0); i < iSize; ++i)
-                _setNextData_write_(_iOffset, &((*_vec)[i]), 0);
-    }
-
-    template<typename T>
-        requires (!std::is_fundamental<T>::value)
-    void _setNextData_write_(int &_iOffset, const std::vector<T> *const _vec, const elemCnt_t &_ui16ElemCount) {
-        const size_t iSize(_vec->size());
-        m_ptrSeqCur->writeCount(_iOffset, static_cast<elemCnt_t>(iSize));
-
-        for (size_t i(0); i < iSize; ++i)
-            _setNextData_write_(_iOffset, &((*_vec)[i]), 0);
-    }
-
-    // W * vector<pair<T, U>>
-    template<typename T, typename U>
-    void _setNextData_write_(int &_iOffset, const std::vector<std::pair<T, U>> * const _vec, const elemCnt_t &_ui16ElemCount) {
-        const size_t iSize(_vec->size());
-
-        m_ptrSeqCur->writeCount(_iOffset, static_cast<elemCnt_t>(iSize));
-
-        if (typeid(T) == typeid(bool)) {
-            bool *ui8ArrRaw(new bool[iSize]);
-            ::memset(ui8ArrRaw, 0, iSize);
-
-            for (size_t i(0); i < iSize; ++i)
-                ui8ArrRaw[i] = ((*_vec)[i]).first;
-
-            _opti_bool_concat(_iOffset, this, static_cast<elemCnt_t>(iSize), ui8ArrRaw);
-
-            delete[] ui8ArrRaw;
-        }
-        else
-            for (int i(0); i < iSize; ++i)
-                _setNextData_write_(_iOffset, &(((*_vec)[i]).first), 0);
-
-        if (typeid(U) == typeid(bool)) {
-            bool *ui8ArrRaw(new bool[iSize]);
-            ::memset(ui8ArrRaw, 0, iSize);
-
-            for (size_t i(0); i < iSize; ++i)
-                ui8ArrRaw[i] = ((*_vec)[i]).second;
-
-            _opti_bool_concat(_iOffset, this, static_cast<elemCnt_t>(iSize), ui8ArrRaw);
-
-            delete[] ui8ArrRaw;
-        }
-        else
-            for (size_t i(0); i < iSize; ++i)
-                _setNextData_write_(_iOffset, &(((*_vec)[i]).second), 0);
-    }
-
-    // W * vector<tuple<T, ...>>
-
-
 
     // 
     void _setNextData_allocSeq() {
@@ -889,7 +1159,7 @@ private:
                 iWeight += _setNextData_userstruct_calcsize_unfold(vec->at(i).get());
         }
         else
-            iWeight += _var->calcsize(this);
+            iWeight += _var->calcsize();
 
         return iWeight;
     }

@@ -168,12 +168,12 @@ void unitaryTests() {
         varA[0].push_back({ {INT8_MAX, true}, {33, false} });
         varA[1].push_back({ {111, false} });
         varA[1].push_back({ {222, false}, {INT8_MIN, true}, {INT8_MAX, true} });
-        pe.setNextData(0, varA, 2);
+        pe.setNextData(0, &varA, 2);
 
         pe.changeTypeTo_Get();
 
         std::vector<std::vector<std::pair<int8_t, bool>>> *varB(new std::vector<std::vector<std::pair<int8_t, bool>>>[2]);
-        //pe.getNextData(0, varB, 2);
+        pe.getNextData(0, &varB);
         for (int i(0); i < 2; ++i)
             for (int j(0); j < varA[i].size(); ++j)
                 for (int k(0); k < varA[i][j].size(); ++k)
