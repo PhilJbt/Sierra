@@ -84,28 +84,166 @@ void unitaryTests() {
     //std::unordered_multiset
     //std::unordered_multimap
 
+    //{
+    //    Cserializing pe;
+
+    //    int8_t varA(INT8_MAX);
+    //    pe.setNextData(0, varA);
+
+    //    pe.changeTypeTo_Get();
+
+    //    int8_t varB(0);
+    //    //pe.getNextData(0, varB);
+
+    //    if (SK_COMPARE_INT(varA, varB)) throw std::runtime_error("");
+    //}
+    //{
+    //    Cserializing pe;
+
+    //    bool varA(true);
+    //    pe.setNextData(0, varA);
+
+    //    pe.changeTypeTo_Get();
+
+    //    bool varB(0);
+    //    //pe.getNextData(0, varB);
+
+    //    if (SK_COMPARE_BOOL(varA, varB)) throw std::runtime_error("");
+    //}
+    //{
+    //    Cserializing pe;
+
+    //    int8_t varA[3] = { INT8_MIN, 0, INT8_MAX };
+    //    pe.setNextData(0, varA, 3);
+
+    //    pe.changeTypeTo_Get();
+
+    //    int8_t varB[3] = { 0 };
+    //    //pe.getNextData(0, varB, 3);
+
+    //    for (int i(0); i < 3; ++i)
+    //        if (SK_COMPARE_INT(varA[i], varB[i])) throw std::runtime_error("");
+    //}
+    //{
+    //    Cserializing pe;
+
+    //    bool varA[10] = { true, false, true, true, false, false, true, true, false, true };
+    //    pe.setNextData(0, varA, 10);
+
+    //    pe.changeTypeTo_Get();
+
+    //    bool varB[10] = { 0 };
+    //    //pe.getNextData(0, varB, 10);
+
+    //    for (int i(0); i < 10; ++i)
+    //        if (SK_COMPARE_BOOL(varA[i], varB[i])) throw std::runtime_error("");
+    //}
+    //{
+    //    Cserializing pe;
+
+    //    int8_t *varA(new int8_t[3]);
+    //    varA[0] = INT8_MIN;
+    //    varA[1] = 0;
+    //    varA[2] = INT8_MAX;
+    //    pe.setNextData(0, varA, 3);
+
+    //    pe.changeTypeTo_Get();
+
+    //    int8_t *varB(new int8_t[3]);
+    //    ::memset(varB, 0, 3 * sizeof(int8_t));
+    //    //pe.getNextData(0, varB, 3);
+
+    //    for (int i(0); i < 3; ++i)
+    //        if (SK_COMPARE_INT(varA[i], varB[i])) throw std::runtime_error("");
+
+    //    delete[] varA;
+    //    delete[] varB;
+    //}
     {
         Cserializing pe;
 
-        std::vector<std::pair<uint8_t, bool>> vecPairBA = {
-            {8,     false},
-            {92,    true},
-            {111,   false},
-            {70,    false},
-            {30,    true},
-            {45,    true},
-            {210,   false},
-            {7,     false},
-            {50,    true},
-            {1,     false}
-        };
-        pe.setNextData(4, vecPairBA);
+        std::vector<std::vector<std::pair<int8_t, bool>>> *varA(new std::vector<std::vector<std::pair<int8_t, bool>>>[2]);
+        varA[0].push_back({ {INT8_MIN, true}, {11, false}, {INT8_MAX, true} });
+        varA[0].push_back({ {22, false} });
+        varA[0].push_back({ {INT8_MAX, true}, {33, false} });
+        varA[1].push_back({ {111, false} });
+        varA[1].push_back({ {222, false}, {INT8_MIN, true}, {INT8_MAX, true} });
+        pe.setNextData(0, varA, 2);
 
         pe.changeTypeTo_Get();
 
-        std::vector<std::pair<uint8_t, bool>> vecPairBB;
-        pe.getNextData(4, vecPairBB);
+        std::vector<std::vector<std::pair<int8_t, bool>>> *varB(new std::vector<std::vector<std::pair<int8_t, bool>>>[2]);
+        //pe.getNextData(0, varB, 2);
+        for (int i(0); i < 2; ++i)
+            for (int j(0); j < varA[i].size(); ++j)
+                for (int k(0); k < varA[i][j].size(); ++k)
+                    if (SK_COMPARE_INT(varA[i][j][k].first, varB[i][j][k].first) || SK_COMPARE_BOOL(varA[i][j][k].second, varB[i][j][k].second)) throw std::runtime_error("");
+        delete[] varA;
+        delete[] varB;
+    }/*
+    {
+        Cserializing pe;
+
+        bool *varA(new bool[10]);
+        varA[0] = true;
+        varA[1] = false;
+        varA[2] = true;
+        varA[3] = true;
+        varA[4] = false;
+        varA[5] = false;
+        varA[6] = true;
+        varA[7] = true;
+        varA[8] = false;
+        varA[9] = true;
+        pe.setNextData(0, varA, 10);
+
+        pe.changeTypeTo_Get();
+
+        bool *varB(new bool[10]);
+        ::memset(varB, 0, 10 * sizeof(bool));
+        pe.getNextData(0, varB, 10);
+
+        for (int i(0); i < 10; ++i)
+            if (SK_COMPARE_BOOL(varA[i], varB[i])) throw std::runtime_error("");
+
+        delete[] varA;
+        delete[] varB;
     }
+    {
+        Cserializing pe;
+
+        std::vector<std::pair<int8_t, bool>> varA = {
+            {INT8_MIN, true}, {0, false}, {INT8_MAX, true}
+        };
+        pe.setNextData(0, varA);
+
+        pe.changeTypeTo_Get();
+
+        std::vector<std::pair<int8_t, bool>> varB;
+        pe.getNextData(0, varB);
+        for (int i(0); i < 3; ++i)
+            if (SK_COMPARE_INT(varA[i].first, varB[i].first) || SK_COMPARE_BOOL(varA[i].second, varB[i].second)) throw std::runtime_error("");
+    }
+    {
+        Cserializing pe;
+
+        std::vector<std::tuple<int8_t, float, bool>> varA = {
+            {INT8_MIN, FLT_MIN, true}, {0, .0f, false}, {INT8_MAX, FLT_MAX, true}
+        };
+        pe.setNextData(0, varA);
+
+        pe.changeTypeTo_Get();
+
+        std::vector<std::tuple<int8_t, float, bool>> varB;
+        pe.getNextData(0, varB);
+        for (int i(0); i < 3; ++i)
+            if (SK_COMPARE_INT(std::get<0>(varA[i]), std::get<0>(varB[i]))
+                || SK_COMPARE_FLT(std::get<1>(varA[i]), std::get<1>(varB[i]))
+                || SK_COMPARE_BOOL(std::get<2>(varA[i]), std::get<2>(varB[i]))
+            ) throw std::runtime_error("");
+    }
+    */
+
     /*
     // STD::PAIR
     {
@@ -121,7 +259,7 @@ void unitaryTests() {
         pe.getNextData(0, varB);
         if (SK_COMPARE_INT(varA.first, varB.first) || SK_COMPARE_BOOL(varA.second, varB.second)) throw std::runtime_error("");
     }
-
+    
     // STD::PAIR *
     {
         Cserializing pe;
@@ -164,7 +302,7 @@ void unitaryTests() {
         for (int i(0); i < 3; ++i)
             if (SK_COMPARE_INT(varA[i].first, varB[i].first) || SK_COMPARE_BOOL(varA[i].second, varB[i].second)) throw std::runtime_error("");
     }
-
+    
     // STD::PAIR * [N]
     {
         Cserializing pe;
@@ -190,8 +328,8 @@ void unitaryTests() {
         delete[] varA;
         delete[] varB;
     }
-
-
+    */
+    /*
     // OPTIMISATIONS
     {
         Cserializing pe;
@@ -199,9 +337,11 @@ void unitaryTests() {
         std::vector<bool> vecBoolA = { true, false, true, true, false, false, true, true, false, true };
         pe.setNextData(0, vecBoolA);
 
+        // [] BOOL
         bool arrBoolA[10] = { true, false, false, true, false, true, false, true, true, false };
-        pe.setNextData(1, arrBoolA);
+        pe.setNextData(1, arrBoolA, 10);
 
+        // * [] BOOL
         bool *ptrArrBA(new bool[10]);
         ptrArrBA[0] = true;
         ptrArrBA[1] = false;
@@ -215,6 +355,7 @@ void unitaryTests() {
         ptrArrBA[9] = true;
         pe.setNextData(2, ptrArrBA, 10);
 
+        // [] PAIR T, BOOL
         std::pair<uint8_t, bool> arrPairBA[10] = {
             {1,     true},
             {50,    false},
@@ -227,8 +368,12 @@ void unitaryTests() {
             {92,    false},
             {8,     true}
         };
-        pe.setNextData(3, arrPairBA);
+        pe.setNextData(3, arrPairBA, 10);
 
+        // * [] PAIR T, BOOL
+        // ...
+
+        // VEC PAIR T, bool
         std::vector<std::pair<uint8_t, bool>> vecPairBA = {
             {8,     false},
             {92,    true},
@@ -241,15 +386,22 @@ void unitaryTests() {
             {50,    true},
             {1,     false}
         };
-        pe.setNextData(4, vecPairBA);
+        pe.setNextData(5, vecPairBA);
 
-        // [] PAIR T, BOOL
+        // * VEC PAIR T, bool
+        // ...
 
-        // * [] PAIR T, BOOL
+        // [] TUPLE T, U, BOOL
+        // ...
 
-        // [] TUPLE T, T, BOOL
+        // * [] TUPLE T, U, BOOL
+        // ...
 
-        // * [] TUPLE T, T, BOOL
+        // VEC TUPLE T, U, BOOL
+        // ...
+
+        // * VEC TUPLE T, U, BOOL
+        // ...
 
         pe.changeTypeTo_Get();
 
@@ -260,7 +412,7 @@ void unitaryTests() {
 
         bool arrBoolB[10] = { false };
         if (!SK_COMPARE_ARR(arrBoolA, arrBoolB, 10)) throw std::runtime_error("");
-        pe.getNextData(1, arrBoolB);
+        pe.getNextData(1, arrBoolB, 10);
         if (SK_COMPARE_ARR(arrBoolA, arrBoolB, 10)) throw std::runtime_error("");
 
         bool *ptrArrBB(new bool[pe.nextDataCount()]);
@@ -280,25 +432,22 @@ void unitaryTests() {
         arrPairBB[7].second = false;
         arrPairBB[8].second = true;
         arrPairBB[9].second = false;
-        for (int i(0); i < 3; ++i)
+        for (int i(0); i < 10; ++i)
             if (!SK_COMPARE_INT(arrPairBA[i].first, arrPairBB[i].first) || !SK_COMPARE_BOOL(arrPairBA[i].second, arrPairBB[i].second)) throw std::runtime_error("");
-        pe.getNextData(0, arrPairBB);
-        for (int i(0); i < 3; ++i)
+        pe.getNextData(3, arrPairBB, 10);
+        for (int i(0); i < 10; ++i)
             if (SK_COMPARE_INT(arrPairBA[i].first, arrPairBB[i].first) || SK_COMPARE_BOOL(arrPairBA[i].second, arrPairBB[i].second)) throw std::runtime_error("");
+
+        // ...
 
         std::vector<std::pair<uint8_t, bool>> vecPairBB;
         for (int i(0); i < 3; ++i)
             if (!SK_COMPARE_VEC(vecPairBA[i].first, vecPairBB[i].first) || !SK_COMPARE_BOOL(vecPairBA[i].second, vecPairBB[i].second)) throw std::runtime_error("");
-        pe.getNextData(0, vecPairBB);
+        pe.getNextData(5, vecPairBB);
         for (int i(0); i < 3; ++i)
             if (SK_COMPARE_VEC(vecPairBA[i].first, vecPairBB[i].first) || SK_COMPARE_BOOL(vecPairBA[i].second, vecPairBB[i].second)) throw std::runtime_error("");
 
 
-        // vec pair T, bool
-
-        // arr tuple T, U, bool
-
-        // vec tuple T, U, bool
 
 
 
@@ -317,7 +466,7 @@ void unitaryTests() {
         int8_t i8A(INT8_MAX);
         std::vector<int64_t> vecA = { INT64_MAX, 0, INT64_MIN };
         uint16_t *ptrUint16A = (new uint16_t);
-            *ptrUint16A = UINT16_MAX;
+                 *ptrUint16A = UINT16_MAX;
         int8_t arrInt8A[3] = { INT8_MIN, -3, INT8_MAX };
         std::vector<bool> vecBoolA = { true, false, true, true, false, false, true, true, false, true };
         float *ptrArrFloatA = (new float[3]);
@@ -339,7 +488,7 @@ void unitaryTests() {
             pe.setNextData(1, i8A);
             pe.setNextData(2, vecA);
             pe.setNextData(3, ptrUint16A, 1);
-            pe.setNextData(4, arrInt8A);
+            pe.setNextData(4, arrInt8A, 3);
             pe.setNextData(5, vecBoolA);
             pe.setNextData(6, ptrArrFloatA, 3);
             if (vecUi16EmptyA.size() > 0)
@@ -394,7 +543,7 @@ void unitaryTests() {
             if (SK_COMPARE_INT(*ptrUint16A, *ptrUint16B)) throw std::runtime_error("");
 
             if (!SK_COMPARE_ARR(arrInt8A, arrInt8B, 3)) throw std::runtime_error("");
-            pe.getNextData(4, arrInt8B);
+            pe.getNextData(4, arrInt8B, 3);
             if (SK_COMPARE_ARR(arrInt8A, arrInt8B, 3)) throw std::runtime_error("");
 
             if (!SK_COMPARE_VEC(vecBoolA, vecBoolB)) throw std::runtime_error("");
@@ -471,7 +620,7 @@ void unitaryTests() {
         i64A[0] = INT64_MIN;
         i64A[1] = 1;
         i64A[2] = INT64_MAX;
-        pe.setNextData(250, i64A);
+        pe.setNextData(250, i64A, 3);
 
         pe.changeTypeTo_Get();
 
@@ -480,7 +629,7 @@ void unitaryTests() {
         i64B[1] = 0;
         i64B[2] = 0;
         if (!SK_COMPARE_ARR(i64A, i64B, 3)) throw std::runtime_error("");
-        pe.getNextData(250, i64B);
+        pe.getNextData(250, i64B, 3);
         if (SK_COMPARE_ARR(i64A, i64B, 3)) throw std::runtime_error("");
     }
     
@@ -491,13 +640,13 @@ void unitaryTests() {
         int64_t i64ArrA[64] { 0 };
         for (int i(0); i < 64; ++i)
             i64ArrA[i] = (::rand() % INT64_MAX) * (::rand() % 2 == 0 ? -1 : 1);
-        pe.setNextData(42, i64ArrA);
+        pe.setNextData(42, i64ArrA, 64);
 
         pe.changeTypeTo_Get();
 
         int64_t i64ArrB[64] { 0 };
         if (!SK_COMPARE_ARR(i64ArrA, i64ArrB, 64)) throw std::runtime_error("");
-        pe.getNextData(42, i64ArrB);
+        pe.getNextData(42, i64ArrB, 64);
         if (SK_COMPARE_ARR(i64ArrA, i64ArrB, 64)) throw std::runtime_error("");
     }
     
@@ -634,7 +783,7 @@ void unitaryTests() {
                 {43, 4.3f, "quarante trois"}
             }
         };
-        pe.setNextData(42, vecA);
+        //pe.setNextData(42, vecA);
 
         pe.changeTypeTo_Get();
 
@@ -642,8 +791,8 @@ void unitaryTests() {
         if (!SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
         pe.getNextData(42, vecB);
         if (SK_COMPARE_VEC(vecA, vecB)) throw std::runtime_error("");
-    }
-
+    }*/
+    /*
     // STD::VECTOR<STD::VECTOR> [N]
     {
         Cserializing pe;
