@@ -60,12 +60,12 @@ public:
         bool                                                       isInfoVec() const { return m_bIsVarInfosVec; }
 
         virtual int calcsize() const { return 0; }
-        virtual void write(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) const {}
-        virtual void read(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) const {}
+        virtual void write(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) {}
+        virtual void read(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) {}
 
     protected:
-        elemCnt_t                                                  m_ui16ElemCount = 0;
-        std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> *m_ptrNode = nullptr;
+        elemCnt_t                                                  m_ui16ElemCount  = 0;
+        std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> *m_ptrNode        = nullptr;
         bool                                                       m_bIsVarInfosVec = false;
     };
 
@@ -82,11 +82,13 @@ public:
         }
 
         void write(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) {
-            _ptrSerializer->_setNextData_write_(_iReadOffset, m_ptrVar, _ui16ElemCount);
+            const T *ptr = const_cast<const T*>(m_ptrVar);
+            //_ptrSerializer->_setNextData_write_(_iReadOffset, ptr, _ui16ElemCount);
         }
 
         void read(int &_iReadOffset, SnextSequence *_sSeq, Cserializing *_ptrSerializer, const elemCnt_t &_ui16ElemCount) {
-            _ptrSerializer->_getNextData_read_(_iReadOffset, m_ptrVar);
+            T *ptr = m_ptrVar;
+            //_ptrSerializer->_getNextData_read_(_iReadOffset, ptr);
         }
 
     private:
@@ -188,18 +190,18 @@ public:
             _iOffset += ui16DataSize;
         }
 
-        void readData(int &_iReadOffset, std::string &_str) {
+        void readData(int &_iReadOffset, std::string *_str, const elemCnt_t &_ui16ElemCount) {
             const elemCnt_t ui16BytesLen(readCount(_iReadOffset));
 
-            _str.resize(ui16BytesLen / sizeof(_str[0]));
+            _str->resize(ui16BytesLen / sizeof((*_str)[0]));
             ::memcpy(&_str[0], &m_ui8ArrBuffer[_iReadOffset], ui16BytesLen);
             _iReadOffset += ui16BytesLen;
         }
 
-        void readData(int &_iReadOffset, std::u32string &_32str) {
+        void readData(int &_iReadOffset, std::u32string *_32str, const elemCnt_t &_ui16ElemCount) {
             const elemCnt_t ui16BytesLen(readCount(_iReadOffset));
 
-            _32str.resize(ui16BytesLen / sizeof(_32str[0]));
+            _32str->resize(ui16BytesLen / sizeof((*_32str)[0]));
             ::memcpy(&_32str[0], &m_ui8ArrBuffer[_iReadOffset], ui16BytesLen);
             _iReadOffset += ui16BytesLen;
         }
@@ -364,13 +366,17 @@ public:
 
     // SET
     template<typename T>
+        requires(!std::is_array<T>::value && !std::is_pointer<T>::value)
     void setNextData(const typeId_t &_ui8TypeId, const T &_var) {
-        _setNextData_write(_ui8TypeId, &_var, 1);
+        const T *const ptr = &_var;
+        const T *const *const ptr2 = &ptr;
+        _setNextData_write(_ui8TypeId, ptr2, 1);
     }
 
     template<typename T, size_t N>
     void setNextData(const typeId_t &_ui8TypeId, const T (&_var)[N]) {
-        _setNextData_write(_ui8TypeId, &_var[0], N);
+        const T *ptr = &_var[0];
+        _setNextData_write(_ui8TypeId, &ptr, N);
     }
 
     template<typename T>
@@ -381,22 +387,26 @@ public:
 
     // GET
     template<typename T>
+        requires(!std::is_array<T>::value && !std::is_pointer<T>::value)
     void getNextData(const typeId_t &_ui8TypeId, T &_var) {
         int iReadCursor(0);
         if (m_ptrSeqCur->getChunkId(iReadCursor) == _ui8TypeId) {
             m_ptrSeqCur->chunkIdPassed(iReadCursor);
 
-            _getNextData_read(iReadCursor, &_var);
+            T *ptr = &_var;
+            T **ptr2 = &ptr;
+            _getNextData_read(iReadCursor, ptr2);
         }
     }
 
     template<typename T, size_t N>
-    void getNextData(const typeId_t &_ui8TypeId, const T(&_var)[N]) {
+    void getNextData(const typeId_t &_ui8TypeId, T (&_var)[N]) {
         int iReadCursor(0);
         if (m_ptrSeqCur->getChunkId(iReadCursor) == _ui8TypeId) {
             m_ptrSeqCur->chunkIdPassed(iReadCursor);
 
-            _getNextData_read(iReadCursor, &_var[0]);
+            T *ptr = &_var[0];
+            _getNextData_read(iReadCursor, &ptr);
         }
     }
 
@@ -567,7 +577,15 @@ private:
         m_ptrSeqCur->writeCount(_iOffset, _ui16ElemCount);
 
         for (size_t i(0); i < _ui16ElemCount; ++i)
-            _setNextData_write_(_iOffset, &((*_var)[i]));
+            _setNextData_write_(_iOffset, &(*_var)[i]);
+    }
+
+    template<typename T>
+    void _setNextData_write_(int &_iOffset, const T (*_var), const elemCnt_t &_ui16ElemCount = 1) {
+        m_ptrSeqCur->writeCount(_iOffset, _ui16ElemCount);
+
+        for (size_t i(0); i < _ui16ElemCount; ++i)
+            _setNextData_write_(_iOffset, &(*_var)[i]);
     }
 
     // CALC * * T
@@ -577,7 +595,17 @@ private:
         int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
 
         for (elemCnt_t i(0); i < _ui16ElemCount; ++i)
-            iWeight += _setNextData_calcSize_(&((*_var)[i]), _bIncludeElemeCntSize);
+            iWeight += _setNextData_calcSize_(&(*_var)[i], _bIncludeElemeCntSize);
+
+        return iWeight;
+    }
+
+    template<typename T>
+    static int _setNextData_calcSize_(const T (*_var), const bool &_bIncludeElemeCntSize, const elemCnt_t &_ui16ElemCount = 1) {
+        int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
+
+        for (elemCnt_t i(0); i < _ui16ElemCount; ++i)
+            iWeight += _setNextData_calcSize_(&(*_var)[i], _bIncludeElemeCntSize);
 
         return iWeight;
     }
@@ -589,7 +617,15 @@ private:
         elemCnt_t ui16Count(m_ptrSeqCur->readCount(_iOffset));
 
         for (elemCnt_t i(0); i < ui16Count; ++i)
-            _getNextData_read_(_iOffset, &((*_var)[i]));
+            _getNextData_read_(_iOffset, &(*_var)[i]);
+    }
+
+    template<typename T>
+    void _getNextData_read_(int &_iOffset, T (*_var)) {
+        elemCnt_t ui16Count(m_ptrSeqCur->readCount(_iOffset));
+
+        for (elemCnt_t i(0); i < ui16Count; ++i)
+            _getNextData_read_(_iOffset, &(*_var)[i]);
     }
 
 
@@ -672,7 +708,20 @@ private:
     // READ * [] T
     template <typename T>
         requires (std::is_fundamental<T>::value)
-    void _getNextData_read_(int &_iOffset, T * _var, const elemCnt_t &_ui16ElemCount) {
+    void _getNextData_read_(int &_iOffset, T * _var) {
+        if (typeid(T) == typeid(bool)) {
+            bool bArrTemp(false);
+            _opti_bool_discat(_iOffset, 1, &bArrTemp);
+
+            *_var = bArrTemp;
+        }
+        else
+            m_ptrSeqCur->readData(_iOffset, &(*_var), 1);
+    }
+
+    template <typename T>
+        requires (std::is_fundamental<T>::value)
+    void _getNextData_read_(int &_iOffset, T *_var, const elemCnt_t &_ui16ElemCount) {
         if (typeid(T) == typeid(bool)) {
             bool *bArrTemp(new bool[_ui16ElemCount]);
             _opti_bool_discat(_iOffset, _ui16ElemCount, bArrTemp);
@@ -682,7 +731,7 @@ private:
 
             delete[] bArrTemp;
         }
-        else 
+        else
             m_ptrSeqCur->readData(_iOffset, &(*_var), _ui16ElemCount);
     }
 
@@ -764,7 +813,7 @@ private:
             bool *arrTemp(new bool[iSize]);
             ::memset(arrTemp, 0, iSize);
             for (size_t i(0); i < iSize; ++i)
-                arrTemp[i] = ((*_vec)[i]);
+                arrTemp[i] = (*_vec[i]);
 
             _opti_bool_concat(_iOffset, this, static_cast<elemCnt_t>(iSize), arrTemp);
 
@@ -823,7 +872,7 @@ private:
             bool *arrTemp(new bool[ui16Count]);
             ::memset(arrTemp, 0, ui16Count);
             for (size_t i(0); i < ui16Count; ++i)
-                arrTemp[i] = ((*_vec)[i]);
+                arrTemp[i] = (*_vec[i]);
 
             _opti_bool_concat(_iOffset, this, ui16Count, arrTemp);
 
@@ -862,7 +911,7 @@ private:
             ::memset(ui8ArrRaw, 0, iSize);
 
             for (size_t i(0); i < iSize; ++i)
-                ui8ArrRaw[i] = ((*_vec)[i]).first;
+                ui8ArrRaw[i] = ((*_vec)[i].first);
 
             _opti_bool_concat(_iOffset, this, static_cast<elemCnt_t>(iSize), ui8ArrRaw);
 
@@ -870,14 +919,14 @@ private:
         }
         else
             for (int i(0); i < iSize; ++i)
-                _setNextData_write_(_iOffset, &(((*_vec)[i].first)));
+                _setNextData_write_(_iOffset, &((*_vec)[i].first));
 
         if (typeid(U) == typeid(bool)) {
             bool *ui8ArrRaw(new bool[iSize]);
             ::memset(ui8ArrRaw, 0, iSize);
 
             for (size_t i(0); i < iSize; ++i)
-                ui8ArrRaw[i] = ((*_vec)[i]).second;
+                ui8ArrRaw[i] = ((*_vec)[i].second);
 
             _opti_bool_concat(_iOffset, this, static_cast<elemCnt_t>(iSize), ui8ArrRaw);
 
@@ -885,7 +934,7 @@ private:
         }
         else
             for (size_t i(0); i < iSize; ++i)
-                _setNextData_write_(_iOffset, &(((*_vec)[i]).second));
+                _setNextData_write_(_iOffset, &((*_vec)[i].second));
     }
 
     // CALC * VECTOR<PAIR<T, U>>
@@ -898,13 +947,13 @@ private:
             iWeight += _opti_bool_calcsize(iSize);
         else
             for (int i(0); i < iSize; ++i)
-                iWeight += _setNextData_calcSize_(&(((*_vec)[i]).first), _bIncludeElemeCntSize);
+                iWeight += _setNextData_calcSize_(&((*_vec)[i].first), _bIncludeElemeCntSize);
 
         if (typeid(U) == typeid(bool))
             iWeight += _opti_bool_calcsize(iSize);
         else
             for (size_t i(0); i < iSize; ++i)
-                iWeight += _setNextData_calcSize_(&(((*_vec)[i]).second), _bIncludeElemeCntSize);
+                iWeight += _setNextData_calcSize_(&((*_vec)[i].second), _bIncludeElemeCntSize);
 
         return iWeight;
     }
@@ -923,13 +972,13 @@ private:
             _opti_bool_discat(_iOffset, iCountBools, bArrTemp);
 
             for (int i(0); i < iCountBools; ++i)
-                ((*_vec)[i]).first = bArrTemp[i];
+                (*_vec)[i].first = bArrTemp[i];
 
             delete[] bArrTemp;
         }
         else
             for (size_t i(0); i < ui16Count; ++i)
-                _getNextData_read_(_iOffset, &(((*_vec)[i]).first), 1);
+                _getNextData_read_(_iOffset, &((*_vec)[i].first), 1);
 
         if (typeid(U) == typeid(bool)) {
             const int iCountBools(ui16Count);
@@ -938,13 +987,13 @@ private:
             _opti_bool_discat(_iOffset, iCountBools, bArrTemp);
 
             for (int i(0); i < iCountBools; ++i)
-                ((*_vec)[i]).second = bArrTemp[i];
+                (*_vec)[i].second = bArrTemp[i];
 
             delete[] bArrTemp;
         }
         else
             for (size_t i(0); i < ui16Count; ++i)
-                _getNextData_read_(_iOffset, &(((*_vec)[i]).second), 1);
+                _getNextData_read_(_iOffset, &((*_vec)[i].second), 1);
     }
 
 
@@ -967,19 +1016,19 @@ private:
     */
 
     // CALC STRING
-    static int _setNextData_calcSize_(const std::string *const _str, const bool &_bIncludeElemeCntSize) {
+    static int _setNextData_calcSize_(const std::string *const *const _str, const bool &_bIncludeElemeCntSize) {
         int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
 
-        iWeight += static_cast<uint32_t>(_str->length()) * static_cast<uint32_t>(sizeof(_str[0]));
+        iWeight += static_cast<uint32_t>((*_str)->length()) * static_cast<uint32_t>(sizeof(_str[0]));
 
         return iWeight;
     }
 
     // CALC U32STRING
-    static int _setNextData_calcSize_(const std::u32string *const _32str, const bool &_bIncludeElemeCntSize) {
+    static int _setNextData_calcSize_(const std::u32string *const *const _32str, const bool &_bIncludeElemeCntSize) {
         int iWeight(_bIncludeElemeCntSize ? sizeof(elemCnt_t) : 0);
 
-        iWeight += static_cast<uint32_t>(_32str->length()) * static_cast<uint32_t>(sizeof(_32str[0]));
+        iWeight += static_cast<uint32_t>((*_32str)->length()) * static_cast<uint32_t>(sizeof(_32str[0]));
 
         return iWeight;
     }
@@ -1240,4 +1289,4 @@ private:
 };
 
 
-#define TEST(...)   friend Cserializing; protected: std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> __v { Cserializing::__INTERNAL__v_push(##__VA_ARGS__) };
+#define SK_SIERRA(...)   friend Cserializing; protected: std::vector<std::unique_ptr<Cserializing::SvarInfo_base>> __v { Cserializing::__INTERNAL__v_push(##__VA_ARGS__) };
