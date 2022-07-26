@@ -4,7 +4,7 @@
 &#160;
 
 ```diff
-- ⚠️ STILL IN DEVELOPMEN, DO NOT USE IT FOR PRODUCTION IN ITS CURRENT STATE ⚠️ -
+- ⚠️ STILL IN DEVELOPMENT, DO NOT USE IT FOR PRODUCTION IN ITS CURRENT STATE ⚠️ -
 ```
 
 &#160;
@@ -26,8 +26,9 @@ It handle builtin types as user struct and classes.
 
 # HOW IT WORKS
 Writing in progress.\
-Check the [header file](../cpp/Cserializing.hpp#L01-L02) for explanations.\
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed et nisi efficitur, convallis tellus eget, volutpat nibh. Phasellus ut orci ut arcu tincidunt tincidunt. Quisque consequat vestibulum arcu quis euismod. Sed porta eu turpis nec iaculis.\
 \
+Check the [header file](../cpp/Cserializing.hpp#L01-L02) for explanations.\
 There are also [some examples](../cpp/Cserializing_unitaryTests.cpp#L01-L02) and [unitary tests](../cpp/Cserializing_unitaryTests.cpp#L03-L04).
 
 ###### [Return to index](#index)
